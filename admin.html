@@ -118,20 +118,20 @@
     </div>
 
     <script>
-        // --- החזרנו את המפתחות ישירות לתוך הקובץ ---
+        // פרטי חיבור ישירים ל-Supabase - מוגדר באופן מקומי שלא מתנגש עם הספרייה
         const SUPABASE_URL = "https://tmugphddzxtamkgxlstu.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWdwaGRkem90YW1rZ3hsc3R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg3NTE1MTUsImV4cCI6MjAzNDMxNTExNX0.ggyq8w3pMNpTcfccHKwYQ_hVFmMC55";
         
-        // יצירת חיבור ישיר אוטומטי ללא תלות ב-Render
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // יצירת קליינט עם שם ייחודי למניעת SyntaxError
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let selectedRowId = { whitelist: null, blacklist: null };
 
-        // פונקציית אתחול פשוטה שמפעילה ישר את הדף
+        // פונקציית אתחול ראשונית
         function initSupabase() {
             loadUsers();
         }
 
-        // ניקוי פורמט טלפונים לפי הגדרות המערכת
+        // ניקוי פורמט מספרי טלפון למבנה אחיד
         function cleanPhoneNumber(phone) {
             if (!phone) return "";
             let cleaned = phone.replace(/[\s\-\(\)]/g, '');
@@ -142,7 +142,7 @@
             return `+${cleaned}`;
         }
 
-        // מנגנון מעבר בין הטאבים
+        // ניהול מעבר בין הטאבים השונים בדף
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -155,10 +155,10 @@
             if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
         }
 
-        // טעינת משתמשים לטבלה
+        // טעינת רשימת המשתמשים מהענן
         async function loadUsers() {
             try {
-                const { data, error } = await supabase.from('users').select('*').order('id', { ascending: true });
+                const { data, error } = await supabaseClient.from('users').select('*').order('id', { ascending: true });
                 if (error) throw error;
                 
                 const tbody = document.getElementById('usersTableBody');
@@ -185,7 +185,7 @@
             }
         }
 
-        // מילוי הטופס בלחיצה על שורה
+        // הזנת נתוני משתמש נבחר לתוך הטופס הצידי
         function populateUserForm(user) {
             document.getElementById('u_id').value = user.id;
             document.getElementById('u_pid').value = user.parking_id || '';
@@ -200,7 +200,7 @@
             document.getElementById('u_status').checked = (user.status === 'active');
         }
 
-        // יצירה או עדכון של משתמש
+        // יצירת משתמש חדש או עדכון משתמש קיים
         async function saveUser(isUpdate) {
             const username = document.getElementById('u_username').value;
             if (!/^[a-zA-Z0-9@\-\._]+$/.test(username)) {
@@ -225,11 +225,11 @@
                 if (isUpdate) {
                     const id = document.getElementById('u_id').value;
                     if (!id) return alert("אנא בחר משתמש מהטבלה לעדכון");
-                    const { error } = await supabase.from('users').update(userData).eq('id', id);
+                    const { error } = await supabaseClient.from('users').update(userData).eq('id', id);
                     if (error) throw error;
                     alert("המשתמש עודכן בהצלחה! 💾");
                 } else {
-                    const { error } = await supabase.from('users').insert([userData]);
+                    const { error } = await supabaseClient.from('users').insert([userData]);
                     if (error) throw error;
                     alert("משתמש חדש נוצר בהצלחה! ➕");
                 }
@@ -239,10 +239,10 @@
             }
         }
 
-        // טעינת 10 אירועים אחרונים
+        // טעינת 10 האירועים האחרונים מהענן
         async function loadEvents() {
             try {
-                const { data, error } = await supabase.from('events_log').select('*').order('created_at', { ascending: false }).limit(10);
+                const { data, error } = await supabaseClient.from('events_log').select('*').order('created_at', { ascending: false }).limit(10);
                 if (error) throw error;
 
                 const tbody = document.getElementById('eventsTableBody');
@@ -267,7 +267,7 @@
             }
         }
 
-        // שידור אירוע ידני
+        // קליטת אירוע ידני חדש במערכת
         async function insertEvent() {
             const evData = {
                 parking_id: document.getElementById('ev_pid').value,
@@ -283,7 +283,7 @@
             };
 
             try {
-                const { error } = await supabase.from('events_log').insert([evData]);
+                const { error } = await supabaseClient.from('events_log').insert([evData]);
                 if (error) throw error;
                 alert("האירוע שודר ונשמר בהצלחה בענן! 🔔");
                 loadEvents();
@@ -292,13 +292,13 @@
             }
         }
 
-        // טעינת רשימות לבנה/שחורה
+        // טעינת רשימות לבנות או שחורות
         async function loadLists(type) {
             const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
             const tbodyId = type === 'whitelist' ? 'whitelistTableBody' : 'blacklistTableBody';
             
             try {
-                const { data, error } = await supabase.from(tableName).select('*').order('created_at', { ascending: false });
+                const { data, error } = await supabaseClient.from(tableName).select('*').order('created_at', { ascending: false });
                 if (error) throw error;
 
                 const tbody = document.getElementById(tbodyId);
@@ -328,7 +328,7 @@
             }
         }
 
-        // הוספה לרשימה
+        // הוספת רכב לרשימה (לבנה/שחורה)
         async function addToList(type) {
             const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
             const prefix = type === 'whitelist' ? 'w_' : 'b_';
@@ -341,7 +341,7 @@
             };
 
             try {
-                const { error } = await supabase.from(tableName).insert([itemData]);
+                const { error } = await supabaseClient.from(tableName).insert([itemData]);
                 if (error) throw error;
                 alert(`הרכב התווסף בהצלחה ל${type === 'whitelist' ? 'רשימה הלבנה' : 'רשימה השחורה'}!`);
                 loadLists(type);
@@ -350,7 +350,7 @@
             }
         }
 
-        // מחיקה מרשימה
+        // מחיקת רכב מרשימה קיימת
         async function deleteFromList(type) {
             const id = selectedRowId[type];
             if (!id) return alert("אנא בחר שורה מהטבלה תחילה על ידי לחיצה עליה");
@@ -359,7 +359,7 @@
             if (!confirm("האם אתה בטוח שברצונך למחוק את הרכב הנבחר מהרשימה?")) return;
 
             try {
-                const { error } = await supabase.from(tableName).delete().eq('id', id);
+                const { error } = await supabaseClient.from(tableName).delete().eq('id', id);
                 if (error) throw error;
                 alert("הרכב הוסר מהרשימה בהצלחה!");
                 selectedRowId[type] = null;
@@ -369,7 +369,7 @@
             }
         }
 
-        // הפעלה מיידית של הדף
+        // הרצת האתחול של המערכת מיד עם עליית הדף
         initSupabase();
     </script>
 
