@@ -118,20 +118,16 @@
     </div>
 
     <script>
-        // פרטי חיבור ישירים ל-Supabase - מוגדר באופן מקומי שלא מתנגש עם הספרייה
         const SUPABASE_URL = "https://tmugphddzxtamkgxlstu.supabase.co"; 
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWdwaGRkenh0YW1rZ3hsc3R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNjAzMjcsImV4cCI6MjA5NzYzNjMyN30.KVf_tCk0K040te14B90vzBIQusl0cik_cdJ24JCjrJs";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWdwaGRkem90YW1rZ3hsc3R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg3NTE1MTUsImV4cCI6MjAzNDMxNTExNX0.ggyq8w3pMNpTcfccHKwYQ_hVFmMC55";
         
-        // יצירת קליינט עם שם ייחודי למניעת SyntaxError
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let selectedRowId = { whitelist: null, blacklist: null };
 
-        // פונקציית אתחול ראשונית
         function initSupabase() {
             loadUsers();
         }
 
-        // ניקוי פורמט מספרי טלפון למבנה אחיד
         function cleanPhoneNumber(phone) {
             if (!phone) return "";
             let cleaned = phone.replace(/[\s\-\(\)]/g, '');
@@ -142,7 +138,6 @@
             return `+${cleaned}`;
         }
 
-        // ניהול מעבר בין הטאבים השונים בדף
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -155,7 +150,7 @@
             if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
         }
 
-        // טעינת רשימת המשתמשים מהענן
+        // טעינת רשימת המשתמשים עם תמיכה ב-User_ID
         async function loadUsers() {
             try {
                 const { data, error } = await supabaseClient.from('users').select('*');
@@ -168,8 +163,12 @@
                     const tr = document.createElement('tr');
                     tr.style.cursor = 'pointer';
                     tr.onclick = () => populateUserForm(user);
+                    
+                    // תיקון קריאת המזהה ל-User_ID במקום id קטן
+                    const displayId = user.User_ID || user.id || '';
+                    
                     tr.innerHTML = `
-                        <td>${user.id}</td>
+                        <td>${displayId}</td>
                         <td>${user.username || ''}</td>
                         <td>${user.user_type || ''}</td>
                         <td>${user.parking_name || ''}</td>
@@ -185,9 +184,9 @@
             }
         }
 
-        // הזנת נתוני משתמש נבחר לתוך הטופס הצידי
         function populateUserForm(user) {
-            document.getElementById('u_id').value = user.id;
+            // התאמה ל-User_ID בטופס
+            document.getElementById('u_id').value = user.User_ID || user.id || '';
             document.getElementById('u_pid').value = user.parking_id || '';
             document.getElementById('u_pname').value = user.parking_name || '';
             document.getElementById('u_type').value = user.user_type || 'operator';
@@ -200,7 +199,6 @@
             document.getElementById('u_status').checked = (user.status === 'active');
         }
 
-        // יצירת משתמש חדש או עדכון משתמש קיים
         async function saveUser(isUpdate) {
             const username = document.getElementById('u_username').value;
             if (!/^[a-zA-Z0-9@\-\._]+$/.test(username)) {
@@ -225,7 +223,9 @@
                 if (isUpdate) {
                     const id = document.getElementById('u_id').value;
                     if (!id) return alert("אנא בחר משתמש מהטבלה לעדכון");
-                    const { error } = await supabaseClient.from('users').update(userData).eq('id', id);
+                    
+                    // תמיכה בעדכון לפי המפתח הנכון
+                    const { error } = await supabaseClient.from('users').update(userData).or(`User_ID.eq.${id},id.eq.${id}`);
                     if (error) throw error;
                     alert("המשתמש עודכן בהצלחה! 💾");
                 } else {
@@ -239,10 +239,11 @@
             }
         }
 
-        // טעינת 10 האירועים האחרונים מהענן
+        // טעינת אירועים מטבלת calls_log המתוקנת
         async function loadEvents() {
             try {
-                const { data, error } = await supabaseClient.from('events_log').select('*').order('created_at', { ascending: false }).limit(10);
+                // שינוי שם הטבלה ל-calls_log לפי מבנה השרת שלך בענן
+                const { data, error } = await supabaseClient.from('calls_log').select('*').order('created_at', { ascending: false }).limit(10);
                 if (error) throw error;
 
                 const tbody = document.getElementById('eventsTableBody');
@@ -267,7 +268,7 @@
             }
         }
 
-        // קליטת אירוע ידני חדש במערכת
+        // שידור אירוע ידני לטבלת calls_log
         async function insertEvent() {
             const evData = {
                 parking_id: document.getElementById('ev_pid').value,
@@ -283,7 +284,7 @@
             };
 
             try {
-                const { error } = await supabaseClient.from('events_log').insert([evData]);
+                const { error } = await supabaseClient.from('calls_log').insert([evData]);
                 if (error) throw error;
                 alert("האירוע שודר ונשמר בהצלחה בענן! 🔔");
                 loadEvents();
@@ -292,43 +293,38 @@
             }
         }
 
-        // טעינת רשימות לבנות או שחורות
-        async function loadLists(type) {
+        function loadLists(type) {
             const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
             const tbodyId = type === 'whitelist' ? 'whitelistTableBody' : 'blacklistTableBody';
             
-            try {
-                const { data, error } = await supabaseClient.from(tableName).select('*').order('created_at', { ascending: false });
-                if (error) throw error;
-
-                const tbody = document.getElementById(tbodyId);
-                tbody.innerHTML = '';
-                
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.style.cursor = 'pointer';
-                    tr.onclick = () => {
-                        document.querySelectorAll(`#${tbodyId} tr`).forEach(r => r.classList.remove('selected'));
-                        tr.classList.add('selected');
-                        selectedRowId[type] = item.id;
-                    };
-                    const date = new Date(item.created_at).toLocaleDateString('he-IL');
-                    tr.innerHTML = `
-                        <td>${item.id}</td>
-                        <td>${item.parking_id || ''}</td>
-                        <td><strong>${item.plate_number || ''}</strong></td>
-                        <td>${item.driver_name || ''}</td>
-                        <td>${date}</td>
-                        <td>${item.notes || ''}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (err) {
-                console.error(`Error loading ${type}:`, err);
-            }
+            supabaseClient.from(tableName).select('*').order('created_at', { ascending: false })
+                .then(({ data, error }) => {
+                    if (error) throw error;
+                    const tbody = document.getElementById(tbodyId);
+                    tbody.innerHTML = '';
+                    
+                    data.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.style.cursor = 'pointer';
+                        tr.onclick = () => {
+                            document.querySelectorAll(`#${tbodyId} tr`).forEach(r => r.classList.remove('selected'));
+                            tr.classList.add('selected');
+                            selectedRowId[type] = item.id;
+                        };
+                        const date = new Date(item.created_at).toLocaleDateString('he-IL');
+                        tr.innerHTML = `
+                            <td>${item.id}</td>
+                            <td>${item.parking_id || ''}</td>
+                            <td><strong>${item.plate_number || ''}</strong></td>
+                            <td>${item.driver_name || ''}</td>
+                            <td>${date}</td>
+                            <td>${item.notes || ''}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }).catch(err => console.error(`Error loading ${type}:`, err));
         }
 
-        // הוספת רכב לרשימה (לבנה/שחורה)
         async function addToList(type) {
             const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
             const prefix = type === 'whitelist' ? 'w_' : 'b_';
@@ -350,7 +346,6 @@
             }
         }
 
-        // מחיקת רכב מרשימה קיימת
         async function deleteFromList(type) {
             const id = selectedRowId[type];
             if (!id) return alert("אנא בחר שורה מהטבלה תחילה על ידי לחיצה עליה");
@@ -369,9 +364,8 @@
             }
         }
 
-        // הרצת האתחול של המערכת מיד עם עליית הדף
         initSupabase();
-    </script>
+</script>
 
 </body>
 </html>
