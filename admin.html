@@ -25,6 +25,7 @@
         th, td { padding: 12px; border: 1px solid var(--border); text-align: center; }
         th { background-color: var(--gray-light); }
         tr:hover { background-color: #f1f3f5; }
+        tr.selected { background-color: #e2e6ea; border: 2px solid var(--primary); }
         .form-box { background: var(--gray-light); padding: 20px; border-radius: 10px; border: 1px solid var(--border); }
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; }
@@ -62,7 +63,7 @@
             </div>
             <div class="form-box">
                 <h4>טופס משתמש</h4>
-                <div class="form-group"><label>User ID:</label><input type="text" id="u_id"></div>
+                <div class="form-group"><label>User ID:</label><input type="text" id="u_id" readonly placeholder="מיוצר אוטומטית"></div>
                 <div class="form-group"><label>מספר חניון:</label><input type="text" id="u_pid"></div>
                 <div class="form-group"><label>שם החניון:</label><input type="text" id="u_pname"></div>
                 <div class="form-group"><label>תפקיד:</label><select id="u_type"><option value="admin">admin</option><option value="manager">manager</option><option value="operator">operator</option></select></div>
@@ -116,15 +117,14 @@
         </div>
     </div>
 
-<script>
-        // המשתנים מוגדרים כעת כריקים, והם יתמלאו אוטומטית מהשרת המאובטח
+    <script>
         let SUPABASE_URL = ""; 
         let SUPABASE_KEY = "";
-        let supabaseClient = null;
+        let supabase = null; // משתנה החיבור הראשי
         let selectedRowId = { whitelist: null, blacklist: null };
 
-        // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
-async function initSupabase() {
+        // 1. אתחול מאובטח מול שרת ה-Render
+        async function initSupabase() {
             try {
                 const response = await fetch("https://hint-intercom-backend.onrender.com/config");
                 if (!response.ok) throw new Error("Failed to fetch config");
@@ -133,21 +133,18 @@ async function initSupabase() {
                 SUPABASE_URL = config.url;
                 SUPABASE_KEY = config.key;
                 
-                // אתחול המשתנה הגלובלי הראשי של Supabase
-                supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                // יצירת החיבור של Supabase
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
-                // בדיקה בטוחה: אם loadUsers קיימת בקובץ, נפעיל אותה. אם לא, נפעיל את loadData
-                if (typeof loadUsers === "function") {
-                    loadUsers();
-                } else if (typeof loadData === "function") {
-                    loadData();
-                }
+                // טעינת המשתמשים אוטומטית ברגע שהחיבור מוכן
+                loadUsers();
             } catch (error) {
                 console.error("Configuration error:", error);
-                alert("שגיאה בטעינת תצורת מערכת מאובטחת משרת ה-Render. ודא שהשרת פעיל.");
+                alert("שגיאה בהתחברות מאובטחת לשרת. ודא ששרת ה-Render פתוח ופעיל.");
             }
         }
 
+        // 2. ניקוי פורמט טלפונים לפי הגדרות המערכת
         function cleanPhoneNumber(phone) {
             if (!phone) return "";
             let cleaned = phone.replace(/[\s\-\(\)]/g, '');
@@ -158,23 +155,244 @@ async function initSupabase() {
             return `+${cleaned}`;
         }
 
+        // 3. מנגנון מעבר בין הטאבים השונים
         function switchTab(tabId) {
-            // תיקון: בדיקה מול משתנה האתחול המעודכן (supabase)
             if (!supabase) return; 
-            
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
             document.getElementById(tabId).classList.add('active');
             if (event && event.currentTarget) event.currentTarget.classList.add('active');
             
-            // הפעלה בטוחה של הטאבים לפי מה שקיים בקוד שלך
-            if(tabId === 'users' && typeof loadUsers === "function") loadUsers();
-            if(tabId === 'users' && typeof loadData === "function") loadData();
-            if(tabId === 'events' && typeof loadEvents === "function") loadEvents();
-            if((tabId === 'whitelist' || tabId === 'blacklist') && typeof loadLists === "function") loadLists(tabId);
+            if(tabId === 'users') loadUsers();
+            if(tabId === 'events') loadEvents();
+            if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
         }
-        
-        // הפעלה אוטומטית רק בסוף טעינת כל הפונקציות
+
+        // 4. ניהול משתמשים - טעינה מה-DB לטבלה
+        async function loadUsers() {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase.from('users').select('*').order('id', { ascending: true });
+                if (error) throw error;
+                
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = '';
+                
+                data.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
+                    tr.onclick = () => populateUserForm(user);
+                    tr.innerHTML = `
+                        <td>${user.id}</td>
+                        <td>${user.username || ''}</td>
+                        <td>${user.user_type || ''}</td>
+                        <td>${user.parking_name || ''}</td>
+                        <td>${user.group_name || 'כללי'} (${user.group_id || 0})</td>
+                        <td style="color: ${user.status === 'active' ? 'green' : 'red'}; font-weight:bold;">
+                            ${user.status === 'active' ? 'פעיל ✔️' : 'מושבת ❌'}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading users:", err);
+            }
+        }
+
+        // מילוי הטופס בלחיצה על שורה בטבלה
+        function populateUserForm(user) {
+            document.getElementById('u_id').value = user.id;
+            document.getElementById('u_pid').value = user.parking_id || '';
+            document.getElementById('u_pname').value = user.parking_name || '';
+            document.getElementById('u_type').value = user.user_type || 'operator';
+            document.getElementById('u_username').value = user.username || '';
+            document.getElementById('u_email').value = user.email || '';
+            document.getElementById('u_password').value = user.password || '';
+            document.getElementById('u_phone').value = user.phone || '';
+            document.getElementById('u_gname').value = user.group_name || '';
+            document.getElementById('u_gid').value = user.group_id || '0';
+            document.getElementById('u_status').checked = (user.status === 'active');
+        }
+
+        // יצירה או עדכון של משתמש
+        async function saveUser(isUpdate) {
+            if (!supabase) return;
+            
+            const username = document.getElementById('u_username').value;
+            // בדיקת תקינות תווי שם משתמש (כולל אותיות, מספרים, וסימנים מותרים: @ - . _)
+            if (!/^[a-zA-Z0-9@\-\._]+$/.test(username)) {
+                alert("שם משתמש לא תקין! מותר להשתמש רק באותיות, מספרים ובסימנים: @ - . _");
+                return;
+            }
+
+            const userData = {
+                parking_id: document.getElementById('u_pid').value,
+                parking_name: document.getElementById('u_pname').value,
+                user_type: document.getElementById('u_type').value,
+                username: username,
+                email: document.getElementById('u_email').value,
+                password: document.getElementById('u_password').value,
+                phone: cleanPhoneNumber(document.getElementById('u_phone').value),
+                group_name: document.getElementById('u_gname').value,
+                group_id: parseInt(document.getElementById('u_gid').value) || 0,
+                status: document.getElementById('u_status').checked ? 'active' : 'disabled'
+            };
+
+            try {
+                if (isUpdate) {
+                    const id = document.getElementById('u_id').value;
+                    if (!id) return alert("אנא בחר משתמש מהטבלה לעדכון");
+                    const { error } = await supabase.from('users').update(userData).eq('id', id);
+                    if (error) throw error;
+                    alert("המשתמש עודכן בהצלחה! 💾");
+                } else {
+                    const { error } = await supabase.from('users').insert([userData]);
+                    if (error) throw error;
+                    alert("משתמש חדש נוצר בהצלחה! ➕");
+                }
+                loadUsers();
+            } catch (err) {
+                alert("שגיאה בשמירת המשתמש: " + err.message);
+            }
+        }
+
+        // 5. ניהול אירועים - טעינת 10 האחרונים
+        async function loadEvents() {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase.from('events_log').select('*').order('created_at', { ascending: false }).limit(10);
+                if (error) throw error;
+
+                const tbody = document.getElementById('eventsTableBody');
+                tbody.innerHTML = '';
+                data.forEach(ev => {
+                    const tr = document.createElement('tr');
+                    const date = new Date(ev.created_at).toLocaleString('he-IL');
+                    tr.innerHTML = `
+                        <td>${ev.parking_id || ''}</td>
+                        <td>${date}</td>
+                        <td>${ev.lane_id || ''}</td>
+                        <td><strong>${ev.plate_number || ''}</strong></td>
+                        <td>${ev.call_duration || 0} ש'</td>
+                        <td>${ev.request_summary || ''}</td>
+                        <td>${ev.driver_name || ''}</td>
+                        <td>${ev.forwarded_to_center ? 'מוקד 📞' : 'אוטומטי 🤖'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading events:", err);
+            }
+        }
+
+        // שידור אירוע ידני חדש
+        async function insertEvent() {
+            if (!supabase) return;
+            const evData = {
+                parking_id: document.getElementById('ev_pid').value,
+                lane_id: document.getElementById('ev_lane').value,
+                plate_number: document.getElementById('ev_plate').value,
+                call_duration: parseInt(document.getElementById('ev_duration').value) || 0,
+                request_summary: document.getElementById('ev_summary').value,
+                actions_taken: document.getElementById('ev_actions').value,
+                driver_name: document.getElementById('ev_dname').value,
+                driver_phone: cleanPhoneNumber(document.getElementById('ev_dphone').value),
+                forwarded_to_center: document.getElementById('ev_fwd').checked,
+                plate_corrected: document.getElementById('ev_corr').checked
+            };
+
+            try {
+                const { error } = await supabase.from('events_log').insert([evData]);
+                if (error) throw error;
+                alert("האירוע שודר ונשמר בהצלחה בענן! 🔔");
+                loadEvents();
+            } catch (err) {
+                alert("שגיאה בשידור האירוע: " + err.message);
+            }
+        }
+
+        // 6. ניהול רשימות (לבנה / שחורה)
+        async function loadLists(type) {
+            if (!supabase) return;
+            const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
+            const tbodyId = type === 'whitelist' ? 'whitelistTableBody' : 'blacklistTableBody';
+            
+            try {
+                const { data, error } = await supabase.from(tableName).select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+
+                const tbody = document.getElementById(tbodyId);
+                tbody.innerHTML = '';
+                
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
+                    tr.onclick = () => {
+                        document.querySelectorAll(`#${tbodyId} tr`).forEach(r => r.classList.remove('selected'));
+                        tr.classList.add('selected');
+                        selectedRowId[type] = item.id;
+                    };
+                    const date = new Date(item.created_at).toLocaleDateString('he-IL');
+                    tr.innerHTML = `
+                        <td>${item.id}</td>
+                        <td>${item.parking_id || ''}</td>
+                        <td><strong>${item.plate_number || ''}</strong></td>
+                        <td>${item.driver_name || ''}</td>
+                        <td>${date}</td>
+                        <td>${item.notes || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(`Error loading ${type}:`, err);
+            }
+        }
+
+        // הוספת רכב לרשימה
+        async function addToList(type) {
+            if (!supabase) return;
+            const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
+            const prefix = type === 'whitelist' ? 'w_' : 'b_';
+            
+            const itemData = {
+                parking_id: document.getElementById(`${prefix}pid`).value,
+                plate_number: document.getElementById(`${prefix}plate`).value,
+                driver_name: document.getElementById(`${prefix}dname`).value,
+                notes: document.getElementById(`${prefix}notes`).value
+            };
+
+            try {
+                const { error } = await supabase.from(tableName).insert([itemData]);
+                if (error) throw error;
+                alert(`הרכב התווסף בהצלחה ל${type === 'whitelist' ? 'רשימה הלבנה' : 'רשימה השחורה'}!`);
+                loadLists(type);
+            } catch (err) {
+                alert("שגיאה בהוספה: " + err.message);
+            }
+        }
+
+        // מחיקה מרשימה
+        async function deleteFromList(type) {
+            if (!supabase) return;
+            const id = selectedRowId[type];
+            if (!id) return alert("אנא בחר שורה מהטבלה תחילה על ידי לחיצה עליה");
+            
+            const tableName = type === 'whitelist' ? 'whitelist' : 'blacklist';
+            if (!confirm("האם אתה בטוח שברצונך למחוק את הרכב הנבחר מהרשימה?")) return;
+
+            try {
+                const { error } = await supabase.from(tableName).delete().eq('id', id);
+                if (error) throw error;
+                alert("הרכב הוסר מהרשימה בהצלחה!");
+                selectedRowId[type] = null;
+                loadLists(type);
+            } catch (err) {
+                alert("שגיאה במחיקה: " + err.message);
+            }
+        }
+
+        // הפעלת האתחול המאובטח ברגע שהדף עולה
         initSupabase();
     </script>
 
