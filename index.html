@@ -15,6 +15,7 @@
             height: 100vh;
             margin: 0;
             padding: 20px;
+            position: relative;
         }
         .container {
             text-align: center;
@@ -102,6 +103,25 @@
             font-size: 0.85rem;
             color: #adb5bd;
         }
+        /* עיצוב הלחצן הסודי שיחשף */
+        .secret-panel-btn {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: #dc3545;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transition: background-color 0.2s;
+        }
+        .secret-panel-btn:hover {
+            background-color: #bd2130;
+        }
     </style>
 </head>
 <body>
@@ -124,14 +144,18 @@
         </footer>
     </div>
 
+    <a href="admin.html" class="secret-panel-btn" id="secretBtn">
+        🛠️ כניסה לכלי ניהול DB
+    </a>
+
     <script>
+    // 1. מנגנון שליחת טופס המתעניינים לשרת ה-Render שלך
     document.getElementById('leadForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const emailInput = document.getElementById('emailInput');
         const submitBtn = document.getElementById('submitBtn');
         const email = emailInput.value;
         
-        // שינוי מצב הכפתור בזמן השליחה
         submitBtn.innerText = 'שולח...';
         submitBtn.disabled = true;
         
@@ -152,9 +176,30 @@
             console.error('Error:', error);
             alert('שגיאת תקשורת. ודא שהחיבור תקין ונסה שנית.');
         } finally {
-            // החזרת הכפתור למצב רגיל
             submitBtn.innerText = 'עדכנו אותי בהשקה';
             submitBtn.disabled = false;
+        }
+    });
+
+    // 2. מנגנון האזנה למקלדת לקוד הסודי לחשיפת הלחצן ל-admin
+    const secretCode = "1qaz@WSX4rfv";
+    let inputBuffer = "";
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key.length === 1) { // קליטת תווים רגילים בלבד
+            inputBuffer += e.key;
+            
+            // שמירת אורך הבאפר בדיוק בגודל הקוד
+            if (inputBuffer.length > secretCode.length) {
+                inputBuffer = inputBuffer.substring(inputBuffer.length - secretCode.length);
+            }
+            
+            // בדיקת התאמה לקוד הסודי
+            if (inputBuffer === secretCode) {
+                document.getElementById('secretBtn').style.display = 'block';
+                alert('גישת מנהל הופעלה. כפתור הניהול זמין בתחתית העמוד.');
+                inputBuffer = ""; // איפוס הבאפר
+            }
         }
     });
     </script>
