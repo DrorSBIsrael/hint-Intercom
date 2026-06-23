@@ -133,11 +133,15 @@ async function initSupabase() {
                 SUPABASE_URL = config.url;
                 SUPABASE_KEY = config.key;
                 
-                // שינוי שם המשתנה ל-supabase הרגיל כדי להתאים לשאר הפונקציות בדף שלך
+                // אתחול המשתנה הגלובלי הראשי של Supabase
                 supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
-                // רק אחרי שהחיבור הצליח, נטען את המשתמשים הראשונים
-                loadUsers();
+                // בדיקה בטוחה: אם loadUsers קיימת בקובץ, נפעיל אותה. אם לא, נפעיל את loadData
+                if (typeof loadUsers === "function") {
+                    loadUsers();
+                } else if (typeof loadData === "function") {
+                    loadData();
+                }
             } catch (error) {
                 console.error("Configuration error:", error);
                 alert("שגיאה בטעינת תצורת מערכת מאובטחת משרת ה-Render. ודא שהשרת פעיל.");
@@ -155,16 +159,23 @@ async function initSupabase() {
         }
 
         function switchTab(tabId) {
-            if (!supabaseClient) return; // הגנה במידה והמערכת טרם אותחלה
+            // תיקון: בדיקה מול משתנה האתחול המעודכן (supabase)
+            if (!supabase) return; 
+            
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
-            if(tabId === 'users') loadUsers();
-            if(tabId === 'events') loadEvents();
-            if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
+            if (event && event.currentTarget) event.currentTarget.classList.add('active');
+            
+            // הפעלה בטוחה של הטאבים לפי מה שקיים בקוד שלך
+            if(tabId === 'users' && typeof loadUsers === "function") loadUsers();
+            if(tabId === 'users' && typeof loadData === "function") loadData();
+            if(tabId === 'events' && typeof loadEvents === "function") loadEvents();
+            if((tabId === 'whitelist' || tabId === 'blacklist') && typeof loadLists === "function") loadLists(tabId);
         }
-        initSupabase(); 
+        
+        // הפעלה אוטומטית רק בסוף טעינת כל הפונקציות
+        initSupabase();
     </script>
 
 </body>
