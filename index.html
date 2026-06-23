@@ -103,7 +103,6 @@
             font-size: 0.85rem;
             color: #adb5bd;
         }
-        /* עיצוב הלחצן הסודי שיחשף */
         .secret-panel-btn {
             display: none;
             position: absolute;
@@ -149,7 +148,6 @@
     </a>
 
     <script>
-    // 1. מנגנון שליחת טופס המתעניינים לשרת ה-Render שלך
     document.getElementById('leadForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const emailInput = document.getElementById('emailInput');
@@ -160,8 +158,10 @@
         submitBtn.disabled = true;
         
         try {
+            // הוספת מצב 'no-cors' או הגדרה מלאה מול שרת ה-Render
             const response = await fetch('https://hint-intercom-backend.onrender.com/leads', {
                 method: 'POST',
+                mode: 'cors', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: email })
             });
@@ -181,24 +181,20 @@
         }
     });
 
-    // 2. מנגנון האזנה למקלדת לקוד הסודי לחשיפת הלחצן ל-admin
+    // מנגנון הקלדת הקוד הסודי בשטח ריק באתר ללא תיבת קלט
     const secretCode = "1qaz@WSX4rfv";
     let inputBuffer = "";
 
     document.addEventListener('keydown', (e) => {
-        if (e.key.length === 1) { // קליטת תווים רגילים בלבד
+        if (e.key.length === 1) {
             inputBuffer += e.key;
-            
-            // שמירת אורך הבאפר בדיוק בגודל הקוד
             if (inputBuffer.length > secretCode.length) {
                 inputBuffer = inputBuffer.substring(inputBuffer.length - secretCode.length);
             }
-            
-            // בדיקת התאמה לקוד הסודי
             if (inputBuffer === secretCode) {
                 document.getElementById('secretBtn').style.display = 'block';
                 alert('גישת מנהל הופעלה. כפתור הניהול זמין בתחתית העמוד.');
-                inputBuffer = ""; // איפוס הבאפר
+                inputBuffer = "";
             }
         }
     });
