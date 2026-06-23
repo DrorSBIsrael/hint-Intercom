@@ -33,8 +33,10 @@
             color: #1a1a1a;
             margin-bottom: 8px;
             text-transform: uppercase;
+            cursor: pointer; /* הופך את הכותרת ללחיצה */
+            user-select: none; /* מונע סימון כחול של הטקסט בלחיצה */
         }
-        .tagline { font-size: 1rem; color: #6c757d; margin-bottom: 30px; }
+        .tagline { font-size: 1rem; color: #6c757d; margin-bottom: 30px; user-select: none; }
         .divider { height: 1px; background: #e9ecef; width: 80px; margin: 0 auto 30px auto; }
         h1 { font-size: 2.2rem; margin-bottom: 15px; color: #111; }
         p { font-size: 1.1rem; margin-bottom: 35px; line-height: 1.6; color: #495057; }
@@ -89,7 +91,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="company-title">Human Intelligence & Tech</div>
+        <div class="company-title" id="companyLogo">Human Intelligence & Tech</div>
         <div class="tagline">AI-Driven Systems</div>
         <div class="divider"></div>
         <div class="status-badge">האתר בהקמה</div>
@@ -135,27 +137,11 @@
         }
     });
 
-    // 2. מנגנון קוד סודי מתוקן וחסין שגיאות (עובד בכל מקום במסך)
-    const secretCode = "1qaz@WSX4rfv";
-    let inputBuffer = "";
-
-    document.addEventListener('keydown', (e) => {
-        // וידאו שהמקש קיים והוא תו בודד (לא Shift, Enter וכו')
-        if (e && e.key && e.key.length === 1) {
-            inputBuffer += e.key;
-            
-            // חיתוך הבאפר לפי אורך הקוד המבוקש
-            if (inputBuffer.length > secretCode.length) {
-                inputBuffer = inputBuffer.substring(inputBuffer.length - secretCode.length);
-            }
-            
-            // בדיקת התאמה
-            if (inputBuffer === secretCode) {
-                document.getElementById('secretBtn').style.display = 'block';
-                alert('גישת מנהל הופעלה. כפתור הניהול זמין בפינה השמאלית התחתונה.');
-                inputBuffer = ""; // איפוס
-            }
-        }
+    // 2. מנגנון סודי חדש: לחיצה כפולה על שם החברה חושפת את הלחצן
+    document.getElementById('companyLogo').addEventListener('dblclick', () => {
+        const secretBtn = document.getElementById('secretBtn');
+        secretBtn.style.display = 'block';
+        alert('גישת מנהל הופעלה בהצלחה! הלחצן האדום מופיע בפינה השמאלית למטה.');
     });
     </script>
 </body>
