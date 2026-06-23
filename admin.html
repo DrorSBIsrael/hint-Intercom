@@ -118,11 +118,9 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://tmugphddzxtamkgxlstu.supabase.co"; 
-        // שים פה את ה-Anon Key האמיתי שלך שמתחיל ב-ey
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWdwaGRkenh0YW1rZ3hsc3R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNjAzMjcsImV4cCI6MjA5NzYzNjMyN30.KVf_tCk0K040te14B90vzBIQusl0cik_cdJ24JCjrJs"; 
-        
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let SUPABASE_URL = ""; 
+        let SUPABASE_KEY = ""; 
+        let supabaseClient = null;
         let selectedRowId = { whitelist: null, blacklist: null };
 
         // פונקציית עזר לנקות פורמט טלפונים
@@ -147,9 +145,25 @@
                 evt.currentTarget.classList.add('active');
             }
             
-            if(tabId === 'users') loadUsers();
-            if(tabId === 'events') loadEvents();
-            if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
+           // פונקציה חדשה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
+        async function initAdminPanel() {
+            try {
+                const response = await fetch("https://hint-intercom-backend.onrender.com/config");
+                if (!response.ok) throw new Error("Failed to fetch config from Render");
+                
+                const config = await response.json();
+                SUPABASE_URL = config.url;
+                SUPABASE_KEY = config.key;
+                
+                // אתחול הקליינט רק אחרי שהמפתחות הגיעו בהצלחה
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                // טעינה אוטומטית של המשתמשים רק כשהחיבור מוכן
+                loadUsers();
+            } catch (error) {
+                console.error("Configuration error:", error);
+                alert("שגיאה בטעינת תצורת מערכת מאובטחת משרת ה-Render. ודא שהשרת פעיל.");
+            }
         }
 
         // טעינת משתמשים עם הדגשת שורה נבחרת
@@ -310,8 +324,8 @@
             }
         }
 
-        // טעינה אוטומטית של המשתמשים כשהדף עולה לראשונה
-        loadUsers();
+// הפעלת האתחול המאובטח שימשוך את המפתחות ויטען את המשתמשים
+        initAdminPanel();
     </script>
 </body>
 </html>
