@@ -124,7 +124,7 @@
         let selectedRowId = { whitelist: null, blacklist: null };
 
         // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
-        async function initSupabase() {
+async function initSupabase() {
             try {
                 const response = await fetch("https://hint-intercom-backend.onrender.com/config");
                 if (!response.ok) throw new Error("Failed to fetch config");
@@ -133,8 +133,8 @@
                 SUPABASE_URL = config.url;
                 SUPABASE_KEY = config.key;
                 
-                // אתחול הקליינט של Supabase עם המפתחות המאובטחים שהגיעו מהשרת
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                // שינוי שם המשתנה ל-supabase הרגיל כדי להתאים לשאר הפונקציות בדף שלך
+                supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
                 // רק אחרי שהחיבור הצליח, נטען את המשתמשים הראשונים
                 loadUsers();
