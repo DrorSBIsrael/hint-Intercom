@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -259,12 +259,13 @@
         // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
         async function initAdminPanel() {
             try {
-                const response = await fetch("https://hint-intercom-backend.onrender.com/config");
+                const LOCAL_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
+                const response = await fetch(`${LOCAL_API_BASE}/api/config`);
                 if (!response.ok) throw new Error("Failed to fetch config from Render");
                 
                 const config = await response.json();
-                SUPABASE_URL = config.url;
-                SUPABASE_KEY = config.key;
+                SUPABASE_URL = config.SUPABASE_URL;
+                SUPABASE_KEY = config.SUPABASE_KEY;
                 
                 // אתחול הקליינט רק אחרי שהמפתחות הגיעו בהצלחה
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -487,8 +488,8 @@
     </div>
 
     <div style="position: fixed; bottom: 10px; left: 10px; font-size: 0.75rem; color: var(--text-muted); z-index: 1000; direction: ltr; text-align: left;">
-        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | גרסה 1.1.3
+        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | גרסה 1.1.4
     </div>
-    <script src="app.js?v=1.1.3"></script>
+    <script src="app.js?v=1.1.4"></script>
 </body>
 </html>

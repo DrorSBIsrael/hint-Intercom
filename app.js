@@ -1001,14 +1001,16 @@ const toggleAllCallsBtn = document.getElementById('toggle-all-calls');
 const allCallsContainer = document.getElementById('all-calls-container');
 let isTableVisible = false;
 
-toggleAllCallsBtn.addEventListener('click', () => {
-    isTableVisible = !isTableVisible;
-    if (isTableVisible) {
-        allCallsContainer.style.display = 'block';
-    } else {
-        allCallsContainer.style.display = 'none';
-    }
-});
+if (toggleAllCallsBtn) {
+    toggleAllCallsBtn.addEventListener('click', () => {
+        isTableVisible = !isTableVisible;
+        if (isTableVisible) {
+            if (allCallsContainer) allCallsContainer.style.display = 'block';
+        } else {
+            if (allCallsContainer) allCallsContainer.style.display = 'none';
+        }
+    });
+}
 
 const toggleAdvBtn = document.getElementById('toggle-adv-search');
 const advContainer = document.getElementById('adv-search-container');
