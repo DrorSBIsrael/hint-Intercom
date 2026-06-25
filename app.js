@@ -584,7 +584,7 @@ async function initDashboard() {
             
             supabaseClient
               .channel('realtime-calls')
-              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls_log' }, payload => {
+              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls' }, payload => {
                 const newCall = payload.new;
                 newCall.isNew = true;
                 

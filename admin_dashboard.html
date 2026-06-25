@@ -390,7 +390,7 @@
 
         // טעינת 10 אירועים אחרונים מטבלת calls_log
         async function loadEvents() {
-            const { data, error } = await supabaseClient.from("calls_log").select("*").order("created_at", { ascending: false }).limit(10);
+            const { data, error } = await supabaseClient.from("calls").select("*").order("created_at", { ascending: false }).limit(10);
             if (error) {
                 console.error("Error loading events:", error);
                 return;
@@ -417,7 +417,7 @@
                 driver_phone: document.getElementById("ev_dphone").value.trim()
             };
             
-            const { error } = await supabaseClient.from("calls_log").insert(eventData);
+            const { error } = await supabaseClient.from("calls").insert(eventData);
             if (error) alert("שגיאה ברישום אירוע: " + error.message);
             else {
                 alert("האירוע נרשם בהצלחה בענן! 🔔");
@@ -425,9 +425,16 @@
             }
         }
 
+        function getSupabaseTableName(tableName) {
+            if (tableName === 'whitelist') return 'authorized_parkings';
+            if (tableName === 'blacklist') return 'blocked_parkings';
+            return tableName;
+        }
+
         // טעינת רשימות לבנות/שחורות
         async function loadLists(tableName) {
-            const { data, error } = await supabaseClient.from(tableName).select("*").order("id", { ascending: false });
+            const sbTable = getSupabaseTableName(tableName);
+            const { data, error } = await supabaseClient.from(sbTable).select("*").order("id", { ascending: false });
             if (error) {
                 console.error(`Error loading ${tableName}:`, error);
                 return;
@@ -456,7 +463,8 @@
                 notes: document.getElementById(`${prefix}_notes`).value.trim()
             };
             
-            const { error } = await supabaseClient.from(tableName).insert(rowData);
+            const sbTable = getSupabaseTableName(tableName);
+            const { error } = await supabaseClient.from(sbTable).insert(rowData);
             if (error) alert("שגיאה בהוספה לרשימה: " + error.message);
             else {
                 alert("הרכב התווסף בהצלחה לרשימה! 🎉");
@@ -470,7 +478,8 @@
             
             if(!confirm("האם אתה בטוח שברצונך למחוק את הרכב הנבחר מהרשימה?")) return;
             
-            const { error } = await supabaseClient.from(tableName).delete().eq("id", id);
+            const sbTable = getSupabaseTableName(tableName);
+            const { error } = await supabaseClient.from(sbTable).delete().eq("id", id);
             if (error) alert("שגיאה במחיקה: " + error.message);
             else {
                 alert("הרכב הוסר מהרשימה בהצלחה!");
@@ -488,8 +497,8 @@
     </div>
 
     <div style="position: fixed; bottom: 10px; left: 10px; font-size: 0.75rem; color: var(--text-muted); z-index: 1000; direction: ltr; text-align: left;">
-        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | גרסה 1.1.5
+        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | גרסה 1.1.6
     </div>
-    <script src="app.js?v=1.1.5"></script>
+    <script src="app.js?v=1.1.6"></script>
 </body>
 </html>
