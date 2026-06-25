@@ -704,7 +704,9 @@ document.getElementById('apply-custom-date')?.addEventListener('click', () => {
 });
 
 function getStatsCalls() {
-    const timeframe = document.getElementById('stats-timeframe').value;
+    const timeframeEl = document.getElementById('stats-timeframe');
+    if (!timeframeEl) return filteredCalls;
+    const timeframe = timeframeEl.value;
     
     let latestDate = new Date();
     if(allCalls.length > 0) {
