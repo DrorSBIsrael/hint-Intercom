@@ -1,15 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smarter Intercom Dashboard</title>
-    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=101">
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=102">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Translations -->
     <script src="translations.js"></script>
+    <!-- Security / DevTools Block -->
+    <script src="security.js?v=2"></script>
 <body class="dark-mode" id="app-body">
 
     <!-- Login Screen -->
@@ -25,11 +27,11 @@
                 <form id="login-form">
                     <div class="input-group">
                         <label for="username" data-i18n="username_lbl">שם משתמש</label>
-                        <input type="text" id="username" autocomplete="username" required>
+                        <input type="text" id="username" autocomplete="username" required pattern="^[a-zA-Z0-9@_\-.]+$" title="שם המשתמש יכול להכיל אותיות, מספרים, וסימנים: @ _ - .">
                     </div>
                     <div class="input-group">
                         <label for="password" data-i18n="password_lbl">סיסמא</label>
-                        <input type="password" id="password" autocomplete="current-password" required pattern="^[a-zA-Z0-9@]+$" title="הסיסמא יכולה להכיל רק אותיות, מספרים ו-@">
+                        <input type="password" id="password" autocomplete="current-password" required pattern="^[a-zA-Z0-9@_\-.]+$" title="הסיסמא יכולה להכיל אותיות, מספרים, וסימנים: @ _ - .">
                     </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="remember-me">
