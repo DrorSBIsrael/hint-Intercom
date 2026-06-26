@@ -177,6 +177,7 @@ function playNotificationSound() {
 
 document.getElementById('sound-toggle-btn')?.addEventListener('click', (e) => {
     isSoundEnabled = !isSoundEnabled;
+    localStorage.setItem('intercom_pref_sound_enabled', isSoundEnabled);
     e.target.innerText = isSoundEnabled ? '🔊' : '🔇';
     e.target.style.opacity = isSoundEnabled ? '1' : '0.7';
     
@@ -188,7 +189,8 @@ document.getElementById('sound-toggle-btn')?.addEventListener('click', (e) => {
     if (isSoundEnabled) playNotificationSound();
 });
 
-document.getElementById('sound-select')?.addEventListener('change', () => {
+document.getElementById('sound-select')?.addEventListener('change', (e) => {
+    localStorage.setItem('intercom_pref_sound_type', e.target.value);
     if (isSoundEnabled) playNotificationSound();
 });
 
@@ -273,6 +275,20 @@ const loginForm = document.getElementById('login-form');
 const loginError = document.getElementById('login-error');
 
 if (loginForm) {
+    // Load remember me
+    const rememberMeCheck = document.getElementById('remember-me');
+    const userField = document.getElementById('username');
+    const passField = document.getElementById('password');
+    if (rememberMeCheck && userField && passField) {
+        const savedUser = localStorage.getItem('intercom_remember_user');
+        const savedPass = localStorage.getItem('intercom_remember_pass');
+        if (savedUser && savedPass) {
+            userField.value = savedUser;
+            passField.value = savedPass;
+            rememberMeCheck.checked = true;
+        }
+    }
+
     loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = document.getElementById('username').value.trim();
@@ -297,6 +313,15 @@ if (loginForm) {
             loginError.innerText = "";
             sessionStorage.setItem('intercom_session_token', data.session_token);
             sessionStorage.setItem('username', user);
+            
+            const rememberMe = document.getElementById('remember-me')?.checked;
+            if (rememberMe) {
+                localStorage.setItem('intercom_remember_user', user);
+                localStorage.setItem('intercom_remember_pass', pass);
+            } else {
+                localStorage.removeItem('intercom_remember_user');
+                localStorage.removeItem('intercom_remember_pass');
+            }
             
 
             // Move to 2FA
@@ -416,9 +441,11 @@ themeToggle.addEventListener('click', () => {
     if (appBody.classList.contains('dark-mode')) {
         appBody.classList.remove('dark-mode');
         appBody.classList.add('light-mode');
+        localStorage.setItem('intercom_pref_theme', 'light-mode');
     } else {
         appBody.classList.remove('light-mode');
         appBody.classList.add('dark-mode');
+        localStorage.setItem('intercom_pref_theme', 'dark-mode');
     }
 });
 
@@ -633,10 +660,57 @@ async function initDashboard() {
     }
 }
 
-document.getElementById('parking-selector').addEventListener('change', (e) => {
+document.getElementById('parking-selector')?.addEventListener('change', (e) => {
     currentParkingId = e.target.value;
+    localStorage.setItem('intercom_pref_parking', currentParkingId);
     applyFilters();
 });
+
+// Load preferences on initialization
+function loadPreferences() {
+    const savedParking = localStorage.getItem('intercom_pref_parking');
+    if (savedParking && document.getElementById('parking-selector')) {
+        document.getElementById('parking-selector').value = savedParking;
+        currentParkingId = savedParking;
+    }
+
+    const savedStatsTimeframe = localStorage.getItem('intercom_pref_stats_timeframe');
+    if (savedStatsTimeframe && document.getElementById('stats-timeframe')) {
+        document.getElementById('stats-timeframe').value = savedStatsTimeframe;
+    }
+
+    const savedGraphTimeframe = localStorage.getItem('intercom_pref_graph_timeframe');
+    if (savedGraphTimeframe && document.getElementById('graph-timeframe')) {
+        document.getElementById('graph-timeframe').value = savedGraphTimeframe;
+    }
+
+    const savedTheme = localStorage.getItem('intercom_pref_theme');
+    if (savedTheme && document.getElementById('app-body')) {
+        const appBody = document.getElementById('app-body');
+        appBody.classList.remove('dark-mode', 'light-mode');
+        appBody.classList.add(savedTheme);
+    }
+
+    const savedSoundEnabled = localStorage.getItem('intercom_pref_sound_enabled');
+    if (savedSoundEnabled !== null) {
+        isSoundEnabled = savedSoundEnabled === 'true';
+        const soundBtn = document.getElementById('sound-toggle-btn');
+        if (soundBtn) {
+            soundBtn.innerText = isSoundEnabled ? '🔊' : '🔇';
+            soundBtn.style.opacity = isSoundEnabled ? '1' : '0.7';
+        }
+        const soundSelect = document.getElementById('sound-select');
+        if (soundSelect) {
+            soundSelect.style.display = isSoundEnabled ? 'block' : 'none';
+        }
+    }
+
+    const savedSoundType = localStorage.getItem('intercom_pref_sound_type');
+    if (savedSoundType && document.getElementById('sound-select')) {
+        document.getElementById('sound-select').value = savedSoundType;
+    }
+}
+loadPreferences();
 
 function applyFilters() {
     if (currentParkingId === 'all') {
@@ -667,6 +741,7 @@ function applyFilters() {
 // UI Updates
 // ----------------------------------------------------
 document.getElementById('stats-timeframe')?.addEventListener('change', (e) => {
+    localStorage.setItem('intercom_pref_stats_timeframe', e.target.value);
     const customContainer = document.getElementById('custom-date-range');
     const loader = document.getElementById('global-loader');
     
@@ -1231,6 +1306,7 @@ function renderTableRows() {
 // Graph
 // ----------------------------------------------------
 document.getElementById('graph-timeframe')?.addEventListener('change', (e) => {
+    localStorage.setItem('intercom_pref_graph_timeframe', e.target.value);
     const customContainer = document.getElementById('custom-graph-date-range');
     if (customContainer) {
         if (e.target.value === 'custom') {
