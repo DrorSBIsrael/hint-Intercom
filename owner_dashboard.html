@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smarter Intercom Dashboard</title>
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=102">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="translations.js"></script>
+    <script src="security.js?v=2"></script>
+    <script>
+        // Check permissions
+        const userRole = sessionStorage.getItem('intercom_user_role');
+        if (userRole !== 'owner' && userRole !== 'manager' && userRole !== 'admin') {
+            window.location.href = 'index.html';
+        }
+    </script>
+</head>
+<body class="dark-mode" id="app-body">
+    <div id="global-loader" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; flex-direction: column;">
+        <img src="logo nb.png" alt="Loading" style="width: 150px; animation: pulse-logo 1.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">
+        <div style="color: white; margin-top: 25px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">טוען נתונים...</div>
+    </div>
+
+    <div id="owner-dashboard-marker" style="display:none;"></div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboard-screen" class="screen active">
+        <img src="logo nb.png?v=3" alt="Floating Logo" style="position: fixed; top: 15px; left: 15px; height: 50px; z-index: 9999; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+        <header class="dashboard-header">
+            <div class="header-right">
+                <button id="logout-btn" class="btn-secondary" data-i18n="logout_btn">יציאה</button>
+                <div class="font-controls">
+                    <button id="font-increase" title="הגדל פונט">A+</button>
+                    <button id="font-decrease" title="הקטן פונט">A-</button>
+                    <div class="lang-dropdown-container" style="position: relative; display: inline-block;">
+                        <button id="current-lang-btn" title="שפה / Language" style="min-width: 80px;">🇮🇱 HE ▾</button>
+                        <div id="lang-dropdown-menu" class="hidden" style="position: absolute; top: 100%; right: 0; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width: 80px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); flex-direction: column; margin-top: 5px;">
+                            <button class="lang-btn" data-lang="he" title="עברית" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇮🇱 HE</button>
+                            <button class="lang-btn" data-lang="ar" title="العربية" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇦🇪 AR</button>
+                            <button class="lang-btn" data-lang="en" title="English" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇺🇸 EN</button>
+                            <button class="lang-btn" data-lang="ru" title="Русский" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇷🇺 RU</button>
+                        </div>
+                    </div>
+                    <button id="theme-toggle" title="החלף עיצוב">🌓</button>
+                </div>
+                
+                
+                <div id="parking-selector-container" style="display: flex; align-items: center; gap: 10px;">
+                    <select id="parking-selector" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color); font-weight: bold; cursor: pointer;">
+                        <option value="all" data-i18n="all_parkings">כל החניונים</option>
+                    </select>
+                    <button class="btn-primary" style="background: var(--accent-blue); padding: 5px 10px; font-size: 0.85rem;" onclick="exportTableToCSV('calls-table', 'calls_log.csv')" title="ייצוא כל השיחות">CSV 📥</button>
+                    <button class="btn-primary" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 5px 10px; font-size: 0.85rem; color: var(--text-color);" onclick="printTable('calls-table')" title="הדפסת שיחות">הדפסת שיחות 🖨️</button>
+                    <button class="btn-primary" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 5px 10px; font-size: 0.85rem; color: var(--text-color);" onclick="printAICost()" title="הדפסת דוח עלויות">הדפסת עלויות 🖨️</button>
+                </div>
+            </div>
+            <div class="header-center" style="flex: 1; display: flex; justify-content: center; align-items: center;">
+                <div id="greeting-container" style="text-align: center; font-size: 1.2rem; font-weight: 500; display: flex; flex-direction: column; justify-content: center;"></div>
+            </div>
+            <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
+                                <div class="global-clock" id="global-clock" style="margin: 0;"></div>
+                <div id="role-nav-buttons" style="display: flex; gap: 10px; margin-right: 15px; position: relative; z-index: 10000;">
+                    <button id="nav-admin-btn" class="btn-primary" style="display: none; padding: 6px 12px; font-size: 0.9rem;" onclick="window.location.href='/admin_dashboard.html'">אדמין</button>
+                    <button id="nav-manager-btn" class="btn-primary" style="display: none; padding: 6px 12px; font-size: 0.9rem;" onclick="window.location.href='/owner_dashboard.html'">מנהל</button>
+                    <button id="nav-operator-btn" class="btn-primary" style="display: inline-block; padding: 6px 12px; font-size: 0.9rem;" onclick="window.location.href='/index.html'">עמוד מוקד</button>
+                </div>
+                <div id="global-date" class="global-date" style="font-size: 1.4rem; font-weight: 600; opacity: 0.8; color: var(--text-color);"></div>
+                </div></header>
+
+        <main class="dashboard-content">
+            <!-- Stats Controls -->
+            <div class="stats-controls" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="stats-timeframe">
+                    <option value="today" data-i18n="tf_today">מתחילת המשמרת (היום)</option>
+                    <option value="7d" data-i18n="tf_7d">7 ימים אחרונים</option>
+                    <option value="30d" data-i18n="tf_30d">30 ימים אחרונים</option>
+                    <option value="3m" data-i18n="tf_3m">3 חודשים אחרונים</option>
+                    <option value="6m" data-i18n="tf_6m">6 חודשים אחרונים</option>
+                    <option value="12m" data-i18n="tf_12m">12 חודשים אחרונים</option>
+                    <option value="all" data-i18n="tf_all">לכל הזמנים</option>
+                    <option value="custom" data-i18n="tf_custom">תאריך ספציפי (מתאריך עד תאריך)</option>
+                </select>
+                <div id="custom-date-range" style="display: none; align-items: center; gap: 10px;">
+                    <input type="date" id="custom-start-date" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color);">
+                    <span>עד</span>
+                    <input type="date" id="custom-end-date" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color);">
+                    <button id="apply-custom-date" class="btn-primary" style="padding: 5px 15px;">החל</button>
+                </div>
+            </div>
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card operator-stat">
+                    <h3 data-i18n="op_calls_title">שיחות שעברו למוקד</h3>
+                    <div class="stat-value" id="stat-op-calls">0</div>
+                </div>
+                <div class="stat-card avg-stat">
+                    <h3 data-i18n="op_avg_title">זמן טיפול (מוקד)</h3>
+                    <div class="stat-value" id="stat-op-avg">0s</div>
+                </div>
+                <div class="stat-card ai-stat">
+                    <h3 data-i18n="ai_calls_title">שיחות שטופלו ע"י AI</h3>
+                    <div class="stat-value" id="stat-ai-calls">0</div>
+                </div>
+                <div class="stat-card avg-stat">
+                    <h3 data-i18n="ai_avg_title">זמן טיפול (AI)</h3>
+                    <div class="stat-value" id="stat-ai-avg">0s</div>
+                </div>
+            </div>
+            
+
+
+            <!-- AI Cost Graph Section -->
+            <div class="graph-section" style="margin-top: 20px;">
+                <div class="section-header" style="margin-bottom: 20px;">
+                    <h2>עלויות וצריכת AI</h2>
+                    <div class="chart-legend" style="display:flex; gap: 16px; margin-left: auto; margin-right: 20px; font-size: 0.9rem;">
+                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-blue); border-radius:2px; margin-left:6px;"></span>שיחות במכסה</div>
+                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-red); border-radius:2px; margin-left:6px;"></span>שיחות AI</div>
+                    </div>
+                </div>
+                
+                <!-- Expanded 2-Column AI Cost Layout -->
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: 380px;">
+                    <!-- Left Column: Total Cost & Graph -->
+                    <div style="display: flex; flex-direction: column; background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color);">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 10px;">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 1.1rem; color: var(--text-muted);">סה"כ עלות לתקופה:</span>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                    מכסה חודשית מנוצלת: <strong id="ai-quota-display" style="color: var(--accent-blue);">0 / 100 שיחות</strong>
+                                </div>
+                            </div>
+                            <span id="ai-cost-display" style="font-size: 2.2rem; font-weight: bold; color: var(--accent-green);">0 ₪</span>
+                        </div>
+                        
+                        <div class="chart-container" id="ai-cost-chart-container" style="flex: 1; height: 100%; min-height: 200px;">
+                            <!-- AI Cost Bar Chart injected by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column: Recent Calls List -->
+                    <div style="display: flex; flex-direction: column; background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); overflow: hidden;">
+                        <h3 style="margin-top: 0; font-size: 1.1rem; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">פירוט שיחות AI</h4>
+                        <div style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                            <ul id="ai-cost-calls-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                                <!-- List injected by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List Management Section -->
+            <div class="graph-section" style="margin-top: 30px;">
+                <div class="section-header" style="margin-bottom: 20px;">
+                    <h2>ניהול מורשים וחסומים</h2>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    
+                    <!-- Blacklist Column -->
+                    <div style="background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--accent-red); display: flex; flex-direction: column;">
+                        <h3 style="color: var(--accent-red); margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">רשימת חסומים (Blacklist)</h3>
+                        
+                        <!-- Add Form -->
+                        <form id="owner-add-blocked-form" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; background: rgba(255, 69, 58, 0.05); padding: 15px; border-radius: 8px;">
+                            <h4 style="margin: 0; font-size: 0.95rem;">הוספת רכב לחסומים:</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <select name="parking_id" required class="adv-search-input owner-parking-select" style="width: 100%;">
+                                    <option value="">בחר חניון (חובה)</option>
+                                    <!-- Options injected by JS -->
+                                </select>
+                                <input type="text" name="plate_number" placeholder="מס רכב (חובה)" required class="adv-search-input" style="width: 100%;">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <input type="text" name="driver_name" placeholder="שם הנהג (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                                <input type="text" name="notes" placeholder="הערות (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                            </div>
+                            <button type="submit" class="btn-primary" style="background: var(--accent-red); align-self: flex-start; padding: 6px 15px; font-size: 0.9rem;">הוסף לחסומים</button>
+                        </form>
+                        
+                        <!-- List -->
+                        <div style="flex: 1; overflow-y: auto; max-height: 320px; padding-right: 5px;">
+                            <ul id="owner-blocked-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                                <!-- Items injected by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Whitelist Column -->
+                    <div style="background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--accent-green); display: flex; flex-direction: column;">
+                        <h3 style="color: var(--accent-green); margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">רשימת מורשים (Whitelist)</h3>
+                        
+                        <!-- Add Form -->
+                        <form id="owner-add-authorized-form" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; background: rgba(48, 209, 88, 0.05); padding: 15px; border-radius: 8px;">
+                            <h4 style="margin: 0; font-size: 0.95rem;">הוספת רכב למורשים:</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <select name="parking_id" required class="adv-search-input owner-parking-select" style="width: 100%;">
+                                    <option value="">בחר חניון (חובה)</option>
+                                    <!-- Options injected by JS -->
+                                </select>
+                                <input type="text" name="plate_number" placeholder="מס רכב (חובה)" required class="adv-search-input" style="width: 100%;">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <input type="text" name="driver_name" placeholder="שם הנהג (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                                <input type="text" name="notes" placeholder="הערות (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                            </div>
+                            <button type="submit" class="btn-primary" style="background: var(--accent-green); align-self: flex-start; padding: 6px 15px; font-size: 0.9rem;">הוסף למורשים</button>
+                        </form>
+                        
+                        <!-- List -->
+                        <div style="flex: 1; overflow-y: auto; max-height: 320px; padding-right: 5px;">
+                            <ul id="owner-authorized-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                                <!-- Items injected by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+
+        <!-- Graph Section -->
+            <div class="graph-section" style="margin-top: -20px;">
+                <div class="section-header">
+                    <h2 data-i18n="graph_title">עומס שיחות</h2>
+                    <div class="chart-legend" style="display:flex; gap: 16px; margin-left: auto; margin-right: 20px; font-size: 0.9rem;">
+                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-green); border-radius:2px; margin-left:6px;"></span>AI</div>
+                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-blue); border-radius:2px; margin-left:6px;"></span>מוקד</div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select id="graph-timeframe">
+                            <option value="24h" selected data-i18n="ai_cost_24h">24 שעות אחרונות</option>
+                            <option value="7d" data-i18n="tf_7d">7 ימים אחרונים</option>
+                            <option value="30d">30 יום אחרונים</option>
+                            <option value="monthly" data-i18n="ai_cost_monthly">חודשי</option>
+                            <option value="all" data-i18n="ai_cost_all">כל הזמנים</option>
+                            <option value="custom" data-i18n="tf_custom">תאריך ספציפי (מתאריך עד תאריך)</option>
+                        </select>
+                        <div id="custom-graph-date-range" style="display: none; align-items: center; gap: 10px;">
+                            <input type="date" id="custom-graph-start-date" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color);">
+                            <span>עד</span>
+                            <input type="date" id="custom-graph-end-date" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color);">
+                            <button id="apply-custom-graph-date" class="btn-primary" style="padding: 5px 15px;">החל</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container" id="bar-chart-container">
+                    <!-- CSS Bar Chart injected by JS -->
+                </div>
+                <div id="avg-stay-text-graph" style="text-align: center; margin-top: 15px; font-size: 0.95rem; color: var(--text-main); font-weight: bold; background: var(--bg-card); padding: 10px; border-radius: var(--border-radius); border: 1px solid var(--border-color); display: inline-block; position: relative; left: 50%; transform: translateX(-50%); margin-bottom: 10px;">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+
+            <!-- All Calls & Search -->
+            <div class="all-calls-section" style="margin-top: -20px;">
+                <div class="section-header">
+                    <h2 data-i18n="all_calls_title">כל השיחות</h2>
+                    <button id="toggle-all-calls" class="btn-text" data-i18n="toggle_show_hide">הסתר/הצג</button>
+                </div>
+                
+                <div id="all-calls-container" class="all-calls-container" style="display: none;">
+                    <div class="global-search-container" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" id="global-search" class="adv-search-input" placeholder="חיפוש חופשי: מספר רכב, שם נהג, מזהה חניון..." data-i18n-ph="global_search_ph" style="flex: 1;">
+                        <button id="toggle-adv-search" style="background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer; padding: 10px 15px; border-radius: var(--border-radius); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;" title="סינון מתקדם" data-i18n-title="adv_search_toggle">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2zm1 .5v1.308l4.372 4.834A.5.5 0 0 1 7 8.5v5.306l2-.666V8.5a.5.5 0 0 1 .128-.334L13.5 3.308V2h-11z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div id="adv-search-container" style="display: none; background: rgba(0,0,0,0.2); padding: 15px; border-radius: var(--border-radius); margin-bottom: 20px;">
+                        <div class="advanced-search-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                            <input type="text" id="search-date" class="adv-search-input" placeholder="תאריך (dd/mm/yyyy)" data-i18n-ph="adv_date">
+                            <input type="text" id="search-time" class="adv-search-input" placeholder="שעה (hh:mm:ss)" data-i18n-ph="adv_time">
+                            <input type="text" id="search-parking" class="adv-search-input" placeholder="מזהה חניון" data-i18n-ph="adv_parking">
+                            <input type="text" id="search-lane" class="adv-search-input" placeholder="נתיב" data-i18n-ph="adv_lane">
+                            <input type="text" id="search-plate" class="adv-search-input" placeholder="מספר רכב" data-i18n-ph="adv_plate">
+                            <input type="text" id="search-driver" class="adv-search-input" placeholder="שם נהג" data-i18n-ph="adv_driver">
+                            <input type="number" id="search-duration" class="adv-search-input" placeholder="זמן שיחה" data-i18n-ph="adv_duration">
+                            
+                            <select id="search-reason" class="adv-search-input">
+                                <option value="" data-i18n="adv_subject">כל הסיבות</option>
+                                <option value="מנוי בתוקף שנכנס כראוי">מנוי בתוקף שנכנס כראוי</option>
+                                <option value="מנוי בתוקף שיצא כראוי">מנוי בתוקף שיצא כראוי</option>
+                                <option value="אין מקום פנוי לחברה בהסכם">אין מקום פנוי לחברה בהסכם</option>
+                                <option value="איבד כרטיס תשלום במכונה">איבד כרטיס תשלום במכונה</option>
+                                <option value="מנוי לא בתוקף">מנוי לא בתוקף</option>
+                                <option value="מצלמה זיהתה מספר לא תקין">מצלמה זיהתה מספר לא תקין</option>
+                                <option value="בעיה טכנית בנתיב / מחסום תקוע">בעיה טכנית בנתיב / מחסום תקוע</option>
+                                <option value="רכב של בעל מוגבלות">רכב של בעל מוגבלות</option>
+                                <option value="רכב ברשימת החסומים של החניון">רכב ברשימת החסומים של החניון</option>
+                            </select>
+                            
+                            <select id="search-handled-by" class="adv-search-input">
+                                <option value="" data-i18n="adv_action">טופל על ידי (הכל)</option>
+                                <option value="ai">AI</option>
+                                <option value="operator">מוקד</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="calls-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="col_date">תאריך ושעה</th>
+                                    <th data-i18n="col_parking">מזהה חניון</th>
+                                    <th data-i18n="col_lane">נתיב</th>
+                                    <th data-i18n="col_plate">מספר רכב</th>
+                                    <th data-i18n="col_driver">נהג</th>
+                                    <th data-i18n="col_duration">זמן שיחה</th>
+                                    <th data-i18n="col_summary">סיבה / פעולה</th>
+                                    <th data-i18n="col_action">סטטוס</th>
+                                </tr>
+                            </thead>
+                            <tbody id="calls-table-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            </main>
+    </div>
+
+    <div style="position: fixed; bottom: 10px; left: 10px; font-size: 0.75rem; color: var(--text-muted); z-index: 1000; direction: ltr; text-align: left;">
+        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | גרסה 1.1.6
+    </div>
+    <script src="app.js?v=1.1.6"></script>
+    <script>
+        if (sessionStorage.getItem('intercom_user_role') === 'admin') {
+            const adminBtn = document.getElementById('nav-admin-btn');
+            if (adminBtn) adminBtn.style.display = 'inline-block';
+        }
+    </script>
+</body>
+</html>
