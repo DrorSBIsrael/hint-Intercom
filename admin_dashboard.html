@@ -117,11 +117,11 @@
 
     <h2 style="margin-bottom: 20px; color: var(--text-color);">ניהול מערכת מרכזי</h2>
     
-<div class="tabs">
-        <button class="admin-tab-btn active" onclick="switchTab('users')">ניהול משתמשים</button>
-        <button class="admin-tab-btn" onclick="switchTab('events')">קליטת אירוע ידני</button>
-        <button class="admin-tab-btn" onclick="switchTab('whitelist')">🤍 רשימה לבנה</button>
-        <button class="admin-tab-btn" onclick="switchTab('blacklist')">🖤 רשימה שחורה</button>
+    <div class="tabs">
+        <button class="admin-tab-btn active" onclick="switchTab('users', this)">ניהול משתמשים</button>
+        <button class="admin-tab-btn" onclick="switchTab('events', this)">קליטת אירוע ידני</button>
+        <button class="admin-tab-btn" onclick="switchTab('whitelist', this)">🤍 רשימה לבנה</button>
+        <button class="admin-tab-btn" onclick="switchTab('blacklist', this)">🖤 רשימה שחורה</button>
     </div>
 
     <div id="users" class="admin-tab-content active">
@@ -240,16 +240,24 @@
             return `+${cleaned}`;
         }
 
-        // מנגנון החלפת טאבים חסין שגיאות דפדפן
-        function switchTab(tabId) {
+        function switchTab(tabId, btnElement) {
             if (!supabaseClient) return; // הגנה: לא מאפשר ללחוץ על טאבים לפני שהמפתחות נטענו
-            const evt = window.event || arguments.callee.caller.arguments[0];
+            
             document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
             
-            document.getElementById(tabId).classList.add('active');
-            if (evt && evt.currentTarget) {
-                evt.currentTarget.classList.add('active');
+            const targetContent = document.getElementById(tabId);
+            if(targetContent) targetContent.classList.add('active');
+            
+            if (btnElement) {
+                btnElement.classList.add('active');
+            } else {
+                // Fallback if not passed
+                document.querySelectorAll('.admin-tab-btn').forEach(el => {
+                    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(tabId)) {
+                        el.classList.add('active');
+                    }
+                });
             }
             
             if(tabId === 'users') loadUsers();
@@ -370,7 +378,6 @@
                 userData.rate_per_minute = 2.20; // Default for operators
             }
 
-            const passwordVal = document.getElementById("u_password").value;
             if (passwordVal) {
                 userData.password_hash = passwordVal;
             } else if (!isUpdate) {
