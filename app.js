@@ -71,12 +71,12 @@ const langDropdownBtn = document.getElementById('current-lang-btn');
 const langDropdownMenu = document.getElementById('lang-dropdown-menu');
 
 if (langDropdownBtn && langDropdownMenu) {
-    langDropdownBtn.addEventListener('click', (e) => {
+    langDropdownBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         langDropdownMenu.classList.toggle('hidden');
     });
     
-    document.addEventListener('click', () => {
+    document?.addEventListener('click', () => {
         if (!langDropdownMenu.classList.contains('hidden')) {
             langDropdownMenu.classList.add('hidden');
         }
@@ -86,7 +86,7 @@ if (langDropdownBtn && langDropdownMenu) {
 document.querySelectorAll('.lang-btn').forEach(btn => {
     // Only bind to elements that actually have data-lang to change it
     if(btn.id !== 'current-lang-btn') {
-        btn.addEventListener('click', (e) => {
+        btn?.addEventListener('click', (e) => {
             const lang = e.target.getAttribute('data-lang');
             if (lang) {
                 currentLang = lang;
@@ -124,7 +124,7 @@ function initAudioContext() {
 }
 
 ['click', 'touchstart', 'keydown'].forEach(evt => {
-    document.addEventListener(evt, initAudioContext);
+    document?.addEventListener(evt, initAudioContext);
 });
 
 function playNotificationSound() {
@@ -289,7 +289,7 @@ if (loginForm) {
         }
     }
 
-    loginForm.addEventListener('submit', async (e) => {
+    if (loginForm) loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = document.getElementById('username').value.trim();
     const pass = document.getElementById('password').value.trim();
@@ -347,7 +347,7 @@ const twoFaError = document.getElementById('two-fa-error');
 
 if (codeInputs.length > 0) {
     codeInputs.forEach((input, index) => {
-        input.addEventListener('input', (e) => {
+        input?.addEventListener('input', (e) => {
         // Allow only numbers
         input.value = input.value.replace(/[^0-9]/g, '');
         
@@ -363,7 +363,7 @@ if (codeInputs.length > 0) {
     });
 
     // Handle backspace
-    input.addEventListener('keydown', (e) => {
+    input?.addEventListener('keydown', (e) => {
         if (e.key === 'Backspace' && input.value === '' && index > 0) {
             codeInputs[index - 1].focus();
         }
@@ -395,8 +395,7 @@ function checkTwoFaCode() {
                 if (data.role === 'admin' || data.role === 'owner' || data.role === 'manager') {
                     window.location.href = 'owner_dashboard.html';
                 } else {
-                    initDashboard();
-                    showScreen('dashboard-screen');
+                    window.location.href = 'operator_dashboard.html';
                 }
             } else {
                 twoFaError.innerText = data.error || "קוד אימות שגוי";
@@ -418,7 +417,7 @@ document.getElementById('close-2fa-btn')?.addEventListener('click', () => {
     if (twoFaError) twoFaError.innerText = '';
 });
 
-document.addEventListener('keydown', (e) => {
+document?.addEventListener('keydown', (e) => {
     const twoFaScreen = document.getElementById('two-fa-screen');
     if (e.key === 'Escape' && twoFaScreen && twoFaScreen.classList.contains('active')) {
         twoFaScreen.classList.remove('active');
@@ -437,7 +436,7 @@ const appBody = document.getElementById('app-body');
 
 let baseFontSize = 16;
 
-themeToggle.addEventListener('click', () => {
+themeToggle?.addEventListener('click', () => {
     if (appBody.classList.contains('dark-mode')) {
         appBody.classList.remove('dark-mode');
         appBody.classList.add('light-mode');
@@ -449,21 +448,21 @@ themeToggle.addEventListener('click', () => {
     }
 });
 
-fontIncrease.addEventListener('click', () => {
+fontIncrease?.addEventListener('click', () => {
     if (baseFontSize < 24) {
         baseFontSize += 2;
         appBody.style.setProperty('--base-font-size', `${baseFontSize}px`);
     }
 });
 
-fontDecrease.addEventListener('click', () => {
+fontDecrease?.addEventListener('click', () => {
     if (baseFontSize > 12) {
         baseFontSize -= 2;
         appBody.style.setProperty('--base-font-size', `${baseFontSize}px`);
     }
 });
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+const logoutBtn = document.getElementById('logout-btn'); if(logoutBtn) logoutBtn?.addEventListener('click', () => {
     // Clear 2FA inputs
     if (typeof codeInputs !== 'undefined') codeInputs.forEach(i => i.value = '');
     const uname = document.getElementById('username');
@@ -474,7 +473,7 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     sessionStorage.removeItem('intercom_session_token');
     sessionStorage.removeItem('intercom_user_role');
     
-    if (document.getElementById('owner-dashboard-marker')) {
+    if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker') || document.getElementById('operator-dashboard-marker')) {
         window.location.href = 'index.html';
     } else {
         showScreen('login-screen');
@@ -511,6 +510,8 @@ async function fetchInitialCalls() {
         
         newCalls = filterDataByAllowedParkings(newCalls);
 
+
+
             if (allCalls.length === 0 || newCalls.length !== allCalls.length || newCalls[0].id !== allCalls[0].id) {
                 const hasNewCall = allCalls.length > 0 && newCalls.length > 0 && newCalls[0].id !== allCalls[0].id;
                 const latestCall = newCalls[0];
@@ -524,6 +525,7 @@ async function fetchInitialCalls() {
                 }
                 
                 allCalls = newCalls;
+                updateActionsDatalist();
                 
                 const role = sessionStorage.getItem('intercom_user_role');
                 const allowedParkingsStr = sessionStorage.getItem('intercom_allowed_parkings');
@@ -812,10 +814,11 @@ function getStatsCalls() {
     } else if (timeframe === 'custom') {
         const startVal = document.getElementById('custom-start-date')?.value;
         const endVal = document.getElementById('custom-end-date')?.value;
-        if (startVal && endVal) {
-            const startD = new Date(startVal);
-            startD.setHours(0, 0, 0, 0);
-            const endD = new Date(endVal);
+        if (startVal && endVal && startVal.length === 10 && endVal.length === 10) {
+            const [sd, sm, sy] = startVal.split('/');
+            const [ed, em, ey] = endVal.split('/');
+            const startD = new Date(`${sy}-${sm}-${sd}T00:00:00`);
+            const endD = new Date(`${ey}-${em}-${ed}T23:59:59`);
             endD.setHours(23, 59, 59, 999);
             statsCalls = filteredCalls.filter(c => {
                 const d = new Date(c.created_at);
@@ -895,6 +898,36 @@ function updateStatistics() {
     if (entEl && exitEl) {
         window.animateValue('stat-entrance-calls', entranceCount, (val) => `${Math.floor(val)} (${entPercent}%)`);
         window.animateValue('stat-exit-calls', exitCount, (val) => `${Math.floor(val)} (${exitPercent}%)`);
+    }
+    
+    // Group lanes
+    const entranceLanes = {};
+    const exitLanes = {};
+    
+    statsCalls.forEach(c => {
+        if (!c.lane_id) return;
+        const laneStr = String(c.lane_id).trim();
+        if (laneStr.startsWith('10')) {
+            entranceLanes[laneStr] = (entranceLanes[laneStr] || 0) + 1;
+        } else if (laneStr.startsWith('20')) {
+            exitLanes[laneStr] = (exitLanes[laneStr] || 0) + 1;
+        }
+    });
+    
+    const formatLanes = (lanesObj, prefix) => {
+        const sorted = Object.entries(lanesObj).sort((a,b) => b[1] - a[1]);
+        if (sorted.length === 0) return 'אין נתונים';
+        return sorted.map(([lane, count]) => `<div style="white-space: nowrap;">${prefix} ${lane}: <b>${count}</b> שיחות</div>`).join('');
+    };
+    
+    const topEntrancesEl = document.getElementById('stat-top-entrances');
+    const topExitsEl = document.getElementById('stat-top-exits');
+    
+    if (topEntrancesEl) {
+        topEntrancesEl.innerHTML = formatLanes(entranceLanes, 'כניסה');
+    }
+    if (topExitsEl) {
+        topExitsEl.innerHTML = formatLanes(exitLanes, 'יציאה');
     }
 
     function getExpectedPeakHours(allCallsArray, refDate) {
@@ -1021,8 +1054,15 @@ function updateRecentCalls() {
             const dateStr = date.toLocaleDateString('he-IL');
             
             const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:var(--accent-blue);">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
-            const reason = c.request_summary || c.actions_taken || '';
-            const reasonHtml = reason ? ` <span style="font-weight: normal; font-size: 0.9em;">(${reason})</span>` : '';
+            const summary = c.request_summary || '';
+            const action = c.actions_taken || '';
+            let reasonHtml = '';
+            if (summary) {
+                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--text-muted);"><span style="color: var(--text-color); font-weight: 600;">בקשה:</span> ${summary}</div>`;
+            }
+            if (action) {
+                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 4px; color: var(--accent-blue);"><span style="font-weight: 600;">פעולה:</span> ${action}</div>`;
+            }
             
             aiList.innerHTML += `
                 <li class="call-item ${animClass}">
@@ -1050,8 +1090,17 @@ function updateRecentCalls() {
             const dateStr = date.toLocaleDateString('he-IL');
             
             const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:var(--accent-blue);">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
-            const reason = c.request_summary || c.actions_taken || '';
-            const reasonHtml = reason ? ` <span style="font-weight: normal; font-size: 0.9em; color: var(--accent-red);">(${reason})</span>` : ` <span style="font-weight: normal; font-size: 0.9em; color: var(--accent-red);">(הועבר למוקד)</span>`;
+            const summary = c.request_summary || '';
+            const action = c.actions_taken || '';
+            let reasonHtml = '';
+            if (summary) {
+                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--accent-red);"><span style="font-weight: 600;">בקשה:</span> ${summary}</div>`;
+            } else {
+                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--accent-red);">(הועבר למוקד)</div>`;
+            }
+            if (action) {
+                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 4px; color: var(--accent-blue);"><span style="font-weight: 600;">פעולה:</span> ${action}</div>`;
+            }
             
             opList.innerHTML += `
                 <li class="call-item ${hlClass} ${animClass}">
@@ -1079,7 +1128,7 @@ const allCallsContainer = document.getElementById('all-calls-container');
 let isTableVisible = false;
 
 if (toggleAllCallsBtn) {
-    toggleAllCallsBtn.addEventListener('click', () => {
+    toggleAllCallsBtn?.addEventListener('click', () => {
         isTableVisible = !isTableVisible;
         if (isTableVisible) {
             if (allCallsContainer) allCallsContainer.style.display = 'block';
@@ -1092,7 +1141,7 @@ if (toggleAllCallsBtn) {
 const toggleAdvBtn = document.getElementById('toggle-adv-search');
 const advContainer = document.getElementById('adv-search-container');
 if (toggleAdvBtn && advContainer) {
-    toggleAdvBtn.addEventListener('click', () => {
+    toggleAdvBtn?.addEventListener('click', () => {
         if (advContainer.style.display === 'none') {
             advContainer.style.display = 'block';
             toggleAdvBtn.style.background = 'var(--accent-blue)';
@@ -1107,8 +1156,6 @@ if (toggleAdvBtn && advContainer) {
 
 const searchInputs = [
     document.getElementById('global-search'),
-    document.getElementById('search-start-date'),
-    document.getElementById('search-end-date'),
     document.getElementById('search-time'),
     document.getElementById('search-parking'),
     document.getElementById('search-lane'),
@@ -1116,6 +1163,7 @@ const searchInputs = [
     document.getElementById('search-driver'),
     document.getElementById('search-duration'),
     document.getElementById('search-reason'),
+    document.getElementById('search-action'),
     document.getElementById('search-handled-by')
 ];
 
@@ -1125,8 +1173,8 @@ function triggerSearch() {
 
 searchInputs.forEach(input => {
     if(input) {
-        input.addEventListener('input', triggerSearch);
-        input.addEventListener('change', triggerSearch);
+        input?.addEventListener('input', triggerSearch);
+        input?.addEventListener('change', triggerSearch);
     }
 });
 
@@ -1136,9 +1184,14 @@ function updateTable() {
     
     let callsToShow = filteredCalls;
     
+    // For the operator dashboard, only show calls that were forwarded to the operator in the table
+    if (window.location.pathname.includes('operator_dashboard')) {
+        callsToShow = callsToShow.filter(c => c.is_forwarded === 'true' || c.is_forwarded === true);
+    }
+    
     const qGlobal = document.getElementById('global-search') ? document.getElementById('global-search').value.trim().toLowerCase() : '';
     const qExactDate = document.getElementById('search-date') ? document.getElementById('search-date').value : '';
-    const qStartDate = document.getElementById('search-start-date') ? document.getElementById('search-start-date').value : '';
+    const dateMode = document.getElementById('search-date-mode') ? document.getElementById('search-date-mode').value : 'exact';
     const qEndDate = document.getElementById('search-end-date') ? document.getElementById('search-end-date').value : '';
     const qTime = document.getElementById('search-time').value.trim().toLowerCase();
     const qParking = document.getElementById('search-parking').value.trim().toLowerCase();
@@ -1147,9 +1200,10 @@ function updateTable() {
     const qDriver = document.getElementById('search-driver').value.trim().toLowerCase();
     const qDuration = document.getElementById('search-duration').value.trim().toLowerCase();
     const qReason = document.getElementById('search-reason').value.trim().toLowerCase();
+    const qAction = document.getElementById('search-action') ? document.getElementById('search-action').value.trim().toLowerCase() : '';
     const qHandledBy = document.getElementById('search-handled-by').value;
     
-    const isSearching = qGlobal || qExactDate || qStartDate || qEndDate || qTime || qParking || qLane || qPlate || qDriver || qDuration || qReason || qHandledBy;
+    const isSearching = qGlobal || qExactDate || qEndDate || qTime || qParking || qLane || qPlate || qDriver || qDuration || qReason || qAction || qHandledBy;
     
     if (isSearching) {
         callsToShow = callsToShow.filter(c => {
@@ -1175,25 +1229,32 @@ function updateTable() {
             const timeStr1 = `${HH}:${MM}:${SS}`;
             const timeStr2 = `${HH}:${MM}`;
             
-            if (qExactDate || qStartDate || qEndDate) {
+            if (qExactDate) {
+                // Parse DD/MM/YYYY
+                const parseDate = (str) => {
+                    const parts = str.split('/');
+                    if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    return null;
+                };
+                
                 const dateOnly = new Date(dateObj);
                 dateOnly.setHours(0,0,0,0);
                 
-                if (qExactDate) {
-                    const exactD = new Date(qExactDate);
-                    exactD.setHours(0,0,0,0);
-                    if (dateOnly.getTime() !== exactD.getTime()) return false;
-                } else {
-                    if (qStartDate) {
-                        const startD = new Date(qStartDate);
-                        startD.setHours(0,0,0,0);
-                        if (dateOnly < startD) return false;
-                    }
-                    if (qEndDate) {
-                        const endD = new Date(qEndDate);
+                const startD = parseDate(qExactDate);
+                if (!startD) return true; // Invalid format yet
+                startD.setHours(0,0,0,0);
+
+                if (dateMode === 'range' && qEndDate) {
+                    const endD = parseDate(qEndDate);
+                    if (endD) {
                         endD.setHours(23,59,59,999);
-                        if (dateObj > endD) return false;
+                        if (dateObj < startD || dateObj > endD) return false;
+                    } else {
+                        // only start date valid
+                        if (dateObj < startD) return false;
                     }
+                } else {
+                    if (dateOnly.getTime() !== startD.getTime()) return false;
                 }
             }
             
@@ -1204,6 +1265,7 @@ function updateTable() {
             if (qDriver && (!c.driver_name || !c.driver_name.toLowerCase().includes(qDriver))) return false;
             if (qDuration && (!c.call_duration || !String(c.call_duration).includes(qDuration))) return false;
             if (qReason && (!c.request_summary || !c.request_summary.toLowerCase().includes(qReason))) return false;
+            if (qAction && (!c.actions_taken || !c.actions_taken.toLowerCase().includes(qAction))) return false;
             
             if (qHandledBy) {
                 const isForwarded = String(c.is_forwarded).toLowerCase() === 'true';
@@ -1240,7 +1302,8 @@ function renderTableRows() {
             <td>${c.plate_number}</td>
             <td>${c.driver_name || '-'}</td>
             <td>${c.call_duration}s</td>
-            <td>${c.request_summary}</td>
+            <td>${c.request_summary || '-'}</td>
+            <td>${c.actions_taken || '-'}</td>
             <td>${status}</td>
         `;
         tbody.appendChild(tr);
@@ -1662,12 +1725,14 @@ const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn?.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        if (!targetId) return; // Skip if it's an admin dashboard tab
+        
         tabButtons.forEach(b => b.classList.remove('active'));
         tabContents.forEach(c => c.style.display = 'none');
         
         btn.classList.add('active');
-        const targetId = btn.getAttribute('data-target');
         const targetContent = document.getElementById(targetId);
         if (targetContent) {
             targetContent.style.display = targetId === 'tab-recent-ai' ? 'block' : 'flex';
@@ -1848,7 +1913,7 @@ function setupOwnerListForms() {
     ['blocked', 'authorized'].forEach(type => {
         const form = document.getElementById(`owner-add-${type}-form`);
         if (form) {
-            form.addEventListener('submit', async (e) => {
+            form?.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const payload = Object.fromEntries(formData.entries());
@@ -1918,10 +1983,11 @@ function calculateAICosts(calls) {
     else if (timeframe === 'custom') {
         const startVal = document.getElementById('custom-start-date')?.value;
         const endVal = document.getElementById('custom-end-date')?.value;
-        if (startVal && endVal) {
-            startWin = new Date(startVal);
-            startWin.setHours(0, 0, 0, 0);
-            endWin = new Date(endVal);
+        if (startVal && endVal && startVal.length === 10 && endVal.length === 10) {
+            const [sd, sm, sy] = startVal.split('/');
+            const [ed, em, ey] = endVal.split('/');
+            startWin = new Date(`${sy}-${sm}-${sd}T00:00:00`);
+            endWin = new Date(`${ey}-${em}-${ed}T23:59:59`);
             endWin.setHours(23, 59, 59, 999);
         }
     }
@@ -2091,6 +2157,58 @@ function renderAICostGraph(graphData) {
     const maxPaid = Math.max(...days.map(d => graphData[d].paidCalls), 5);
     
     const chartWrapper = document.createElement('div');
+    const isMobileOperator = document.body.classList.contains('operator-page') && window.innerWidth <= 768;
+    
+    if (isMobileOperator) {
+        chartWrapper.style.display = 'block';
+        chartWrapper.style.height = '100%';
+        chartWrapper.style.width = '100%';
+        chartWrapper.style.padding = '10px 0';
+        
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.style.overflow = 'visible';
+        
+        let freePoints = [];
+        let paidPoints = [];
+        const step = days.length > 1 ? (100 / (days.length - 1)) : 0;
+        
+        days.forEach((day, i) => {
+            const data = graphData[day];
+            const x = days.length > 1 ? (i * step) : 50;
+            // Leave 10% padding at top so lines don't hit the very ceiling
+            const freeY = 100 - ((data.freeCalls / (maxFree || 1)) * 90);
+            const paidY = 100 - ((data.paidCalls / (maxPaid || 1)) * 90);
+            
+            freePoints.push(`${x},${freeY}`);
+            paidPoints.push(`${x},${paidY}`);
+        });
+        
+        const freePoly = document.createElementNS(svgNS, 'polyline');
+        freePoly.setAttribute('points', freePoints.join(' '));
+        freePoly.setAttribute('fill', 'none');
+        freePoly.setAttribute('stroke', 'var(--accent-blue)');
+        freePoly.setAttribute('stroke-width', '3');
+        freePoly.setAttribute('vector-effect', 'non-scaling-stroke');
+        
+        const paidPoly = document.createElementNS(svgNS, 'polyline');
+        paidPoly.setAttribute('points', paidPoints.join(' '));
+        paidPoly.setAttribute('fill', 'none');
+        paidPoly.setAttribute('stroke', 'var(--accent-green)');
+        paidPoly.setAttribute('stroke-width', '3');
+        paidPoly.setAttribute('vector-effect', 'non-scaling-stroke');
+        
+        svg.appendChild(freePoly);
+        svg.appendChild(paidPoly);
+        chartWrapper.appendChild(svg);
+        container.appendChild(chartWrapper);
+        return;
+    }
+    
     chartWrapper.style.display = 'flex';
     chartWrapper.style.height = '100%';
     chartWrapper.style.alignItems = 'flex-end';
@@ -2164,12 +2282,12 @@ function renderAICostGraph(graphData) {
         tooltip.style.textAlign = 'center';
         tooltip.style.lineHeight = '1.4';
         
-        col.addEventListener('mouseenter', () => {
+        col?.addEventListener('mouseenter', () => {
             tooltip.style.opacity = '1';
             col.style.background = 'rgba(255,255,255,0.03)';
             col.style.borderRadius = '4px 4px 0 0';
         });
-        col.addEventListener('mouseleave', () => {
+        col?.addEventListener('mouseleave', () => {
             tooltip.style.opacity = '0';
             col.style.background = 'transparent';
         });
@@ -2205,12 +2323,12 @@ document.getElementById('search-authorized')?.addEventListener('input', () => {
 
 
 // Auto-start dashboard
-if (document.getElementById('owner-dashboard-marker')) {
+if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker') || document.getElementById('operator-dashboard-marker')) {
     initDashboard();
-} else if (!document.getElementById('admin-dashboard-marker')) {
-    if (sessionStorage.getItem('intercom_session_token')) {
-        showScreen('dashboard-screen');
-        initDashboard();
+} else {
+    // We are on index.html
+    if (sessionStorage.getItem('intercom_session_token') && !sessionStorage.getItem('intercom_token')) {
+        showScreen('two-fa-screen');
     }
 }
 
@@ -2222,7 +2340,7 @@ setInterval(() => {
     // Fallback if user didn't log in again
     if (!role) {
         // If they ever visit admin, they are an admin.
-        if (path.includes('admin_dashboard')) {
+        if (path.includes('admin_dashboard') || path.includes('finance')) {
             role = 'admin';
             sessionStorage.setItem('intercom_user_role', 'admin');
         } else if (path.includes('owner_dashboard')) {
@@ -2233,13 +2351,11 @@ setInterval(() => {
     let roleNavContainer = document.getElementById('role-nav-buttons');
     if (roleNavContainer && (role === 'owner' || role === 'manager' || role === 'admin')) {
         roleNavContainer.style.display = 'flex';
-        roleNavContainer.style.background = 'rgba(0,0,0,0.2)';
-        roleNavContainer.style.padding = '4px 8px';
-        roleNavContainer.style.borderRadius = '8px';
+
         roleNavContainer.style.border = '1px solid rgba(255,255,255,0.1)';
         
         const isOwner = path.includes('owner_dashboard');
-        const isAdmin = path.includes('admin_dashboard');
+        const isAdmin = path.includes('admin_dashboard') || path.includes('finance');
         const isOperator = (!isOwner && !isAdmin);
 
         const btnAdmin = document.getElementById('nav-admin-btn');
@@ -2339,3 +2455,98 @@ window.printAICost = function() {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 };
 
+
+// ----------------------------------------------------
+// Init Flatpickr and Advanced Filters
+// ----------------------------------------------------
+
+
+
+// ----------------------------------------------------
+// Input Masks and Date Mode
+// ----------------------------------------------------
+function applyDateMask(el) {
+    if (!el) return;
+    el.addEventListener('input', function(e) {
+        if (e.inputType === 'deleteContentBackward') return;
+        let v = this.value.replace(/\D/g, '');
+        if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+        if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5, 9);
+        this.value = v;
+        if (v.length === 10 || v.length === 0) triggerSearch();
+    });
+}
+
+function applyTimeMask(el) {
+    if (!el) return;
+    el.addEventListener('input', function(e) {
+        if (e.inputType === 'deleteContentBackward') return;
+        let v = this.value.replace(/\D/g, '');
+        if (v.length > 2) v = v.substring(0,2) + ':' + v.substring(2);
+        if (v.length > 5) v = v.substring(0,5) + ':' + v.substring(5, 7);
+        this.value = v;
+        if (v.length === 8 || v.length === 0) triggerSearch();
+    });
+}
+
+applyDateMask(document.getElementById('search-date'));
+applyDateMask(document.getElementById('search-end-date'));
+applyTimeMask(document.getElementById('search-time'));
+
+const dateModeEl = document.getElementById('search-date-mode');
+const endDateEl = document.getElementById('search-end-date');
+if (dateModeEl && endDateEl) {
+    dateModeEl.addEventListener('change', function() {
+        if (this.value === 'range') {
+            endDateEl.style.display = 'block';
+        } else {
+            endDateEl.style.display = 'none';
+            endDateEl.value = '';
+        }
+        triggerSearch();
+    });
+}
+
+// ----------------------------------------------------
+// Dynamic Actions Datalist
+// ----------------------------------------------------
+function updateActionsDatalist() {
+    const actionDatalist = document.getElementById('common-actions');
+    const reasonDatalist = document.getElementById('common-reasons');
+    
+    if (actionDatalist) {
+        const actions = [...new Set(allCalls.map(c => c.actions_taken).filter(a => a && a.trim() !== ''))];
+        const actionDefaults = ["שער נפתח", "לא נפתח שער / סירוב", "הוכנס מספר רכב ידנית", "תקלה טכנית דווחה", "שיחה מנותקת"];
+        const allUniqueActions = [...new Set([...actionDefaults, ...actions])].sort();
+        
+        actionDatalist.innerHTML = '';
+        allUniqueActions.forEach(act => {
+            const option = document.createElement('option');
+            option.value = act;
+            actionDatalist.appendChild(option);
+        });
+    }
+    
+    if (reasonDatalist) {
+        const reasons = [...new Set(allCalls.map(c => c.request_summary).filter(r => r && r.trim() !== ''))];
+        const reasonDefaults = ["מנוי בתוקף שנכנס כראוי", "לא מזוהה במצלמה", "מנוי פג תוקף", "תקלה בחשבון"]; // Just a few defaults, the rest comes from DB
+        const allUniqueReasons = [...new Set([...reasonDefaults, ...reasons])].sort();
+        
+        reasonDatalist.innerHTML = '';
+        allUniqueReasons.forEach(res => {
+            const option = document.createElement('option');
+            option.value = res;
+            reasonDatalist.appendChild(option);
+        });
+    }
+}
+
+// Toggle AI lists on mobile
+const toggleAiLists = document.getElementById('toggle-ai-lists');
+if (toggleAiLists) {
+    toggleAiLists.addEventListener('click', () => {
+        const container = document.getElementById('ai-lists-container');
+        container.classList.toggle('open');
+        toggleAiLists.innerText = container.classList.contains('open') ? 'הסתר' : 'הצג';
+    });
+}

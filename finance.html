@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmarterIntercom - (Admin) ניהול כספים</title>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css?v=113">
+    <link rel="stylesheet" href="mobile.css?v=3">
+</head>
+<body class="dark-theme">
+    <div id="admin-dashboard-marker" style="display:none;"></div>
+    
+    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: var(--text-color);">ניהול כספים וחיובים 💸</h2>
+            <button class="btn btn-primary" onclick="window.location.href='admin_dashboard.html'" style="background: var(--bg-panel); border: 1px solid var(--border-color); color: var(--text-color);">🔙 חזרה לפאנל אדמין</button>
+        </div>
+        
+        <div id="finance" style="padding: 20px 0;">
+            <div class="flex-header" style="justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <h3 id="finance-title">סיכום כספי</h3>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select id="finance-period" onchange="onPeriodChange()" style="padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color); font-weight: bold; cursor: pointer;">
+                        <option value="this_month">חודש נוכחי</option>
+                        <option value="last_month">חודש שעבר</option>
+                        <option value="all_time">לכל הזמנים</option>
+                        <option value="custom">תאריכים מותאמים</option>
+                    </select>
+                    
+                    <div id="finance-custom-dates" style="display: none; align-items: center; gap: 10px;">
+                        <input type="text" id="finance-start" class="date-mask" placeholder="DD/MM/YYYY" maxlength="10" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color); min-width: 140px; font-size: 1rem; font-family: inherit;">
+                        <span>עד</span>
+                        <input type="text" id="finance-end" class="date-mask" placeholder="DD/MM/YYYY" maxlength="10" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color); min-width: 140px; font-size: 1rem; font-family: inherit;">
+                        <button class="btn btn-primary" onclick="loadFinancialSummary()" style="padding: 8px 15px;">החל</button>
+                    </div>
+                    
+                    <select id="finance-filter" onchange="applyFinanceFilter()" style="padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-color); cursor: pointer; max-width: 250px;">
+                        <option value="all">כל הקבוצות והחניונים</option>
+                    </select>
+
+                    <button class="btn btn-refresh" onclick="loadFinancialSummary()">🔄 חשב מחדש</button>
+                </div>
+            </div>
+            <div id="finance-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                <!-- Finance cards will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="security.js?v=2"></script>
+    <script src="translations.js"></script>
+    <script src="app.js?v=1.1.28"></script>
+    <script>
+        let adminSupabaseUrl = ""; 
+        let adminSupabaseKey = ""; 
+        let adminSupabaseClient = null;
+
+                function onPeriodChange() {
+            const period = document.getElementById("finance-period").value;
+            const customDates = document.getElementById("finance-custom-dates");
+            if (period === 'custom') {
+                customDates.style.display = 'flex';
+            } else {
+                customDates.style.display = 'none';
+                loadFinancialSummary();
+            }
+        }
+
+        
+        // Date masking logic (DD/MM/YYYY)
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('date-mask')) {
+                let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                if (v.length >= 5) {
+                    e.target.value = `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
+                } else if (v.length >= 3) {
+                    e.target.value = `${v.slice(0,2)}/${v.slice(2)}`;
+                } else {
+                    e.target.value = v;
+                }
+            }
+        });
+
+        async function initFinancePanel() {
+            try {
+                const response = await fetch("/api/config");
+                if (!response.ok) throw new Error("Failed to fetch config from local server");
+                
+                const config = await response.json();
+                adminSupabaseUrl = config.SUPABASE_URL;
+                adminSupabaseKey = config.SUPABASE_KEY;
+                
+                adminSupabaseClient = supabase.createClient(adminSupabaseUrl, adminSupabaseKey);
+                loadFinancialSummary();
+            } catch (error) {
+                console.error("Configuration error:", error);
+                alert("שגיאה בטעינת תצורת מערכת: " + error.message);
+            }
+        }
+
+        
+        function applyFinanceFilter() {
+            const filterVal = document.getElementById('finance-filter').value;
+            const cards = document.querySelectorAll('.finance-group-card');
+            
+            cards.forEach(card => {
+                if (filterVal === 'all') {
+                    card.style.display = 'flex';
+                    return;
+                }
+                
+                if (filterVal.startsWith('group_')) {
+                    const targetGroup = filterVal.replace('group_', '');
+                    if (card.dataset.groupName === targetGroup) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                } else if (filterVal.startsWith('parking_')) {
+                    const targetParking = filterVal.replace('parking_', '');
+                    const parkingsArr = card.dataset.parkings.split(',');
+                    if (parkingsArr.includes(targetParking)) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        async function loadFinancialSummary() {
+            const grid = document.getElementById("finance-grid");
+            const title = document.getElementById("finance-title");
+            const period = document.getElementById("finance-period").value;
+            
+            grid.innerHTML = "<p>טוען נתונים ומחשב עלויות...</p>";
+            
+            let queryStart, queryEnd, titleText;
+            const now = new Date();
+            
+            const formatHeDate = (d) => {
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yy = d.getFullYear();
+                return `${dd}/${mm}/${yy}`;
+            };
+            const getHeMonth = (d) => new Intl.DateTimeFormat('he-IL', { month: 'long' }).format(d);
+
+            if (period === 'this_month') {
+                const sD = new Date(now.getFullYear(), now.getMonth(), 1);
+                const eD = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                queryStart = sD.toISOString();
+                queryEnd = eD.toISOString();
+                titleText = `סיכום כספי: החודש הנוכחי (${getHeMonth(sD)}, מ-${formatHeDate(sD)} עד ${formatHeDate(eD)})`;
+            } else if (period === 'last_month') {
+                const sD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const eD = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+                queryStart = sD.toISOString();
+                queryEnd = eD.toISOString();
+                titleText = `סיכום כספי: חודש שעבר (${getHeMonth(sD)}, מ-${formatHeDate(sD)} עד ${formatHeDate(eD)})`;
+            } else if (period === 'custom') {
+                const s = document.getElementById("finance-start").value;
+                const e = document.getElementById("finance-end").value;
+                if (!s || !e || s.length !== 10 || e.length !== 10) {
+                    grid.innerHTML = "<p style='color:orange;'>אנא הזן תאריכי התחלה וסיום בפורמט מלא DD/MM/YYYY.</p>";
+                    return;
+                }
+                const [sd, sm, sy] = s.split('/');
+                const [ed, em, ey] = e.split('/');
+                
+                // Parse correctly using standard format YYYY-MM-DD
+                const sDate = new Date(`${sy}-${sm}-${sd}T00:00:00`);
+                queryStart = sDate.toISOString();
+                const eDate = new Date(`${ey}-${em}-${ed}T23:59:59`);
+                queryEnd = eDate.toISOString();
+                titleText = `סיכום כספי: מ-${s} עד ${e}`;
+            } else {
+                // all_time
+                queryStart = "2020-01-01T00:00:00Z";
+                queryEnd = new Date().toISOString();
+                titleText = "סיכום כספי: לכל הזמנים";
+            }
+            
+            title.innerText = titleText;
+            
+            try {
+                const { data: users, error: usersErr } = await adminSupabaseClient.from("users").select("parking_id, parking_name, group_name");
+                if (usersErr) throw usersErr;
+                
+                const parkingMap = {};
+                users.forEach(u => {
+                    if (u.parking_id) {
+                        parkingMap[u.parking_id] = {
+                            groupName: u.group_name || u.parking_name || 'ללא שם',
+                            parkingName: u.parking_name || 'ללא שם'
+                        };
+                    }
+                });
+
+                const { data: calls, error: callsErr } = await adminSupabaseClient
+                    .from("calls_log")
+                    .select("*")
+                    .gte("created_at", queryStart)
+                    .lte("created_at", queryEnd)
+                    .order("created_at", { ascending: true });
+                    
+                if (callsErr) throw callsErr;
+
+                const groupsData = {}; 
+                const monthlyQuotas = {}; 
+                
+                const rateStr = sessionStorage.getItem('intercom_rate_per_minute');
+                const ratePerMinute = rateStr ? parseFloat(rateStr) : 2.20;
+                const ratePerSec = ratePerMinute / 60.0;
+                
+                calls.forEach(c => {
+                    const pid = c.parking_id;
+                    const pInfo = parkingMap[pid] || { groupName: 'לא משויך', parkingName: pid || 'לא ידוע' };
+                    const pName = pInfo.parkingName;
+                    const gName = pInfo.groupName;
+                    
+                    // Month-Year identifier for applying quota separately each month
+                    const callDate = new Date(c.created_at);
+                    const monthKey = `${callDate.getFullYear()}-${callDate.getMonth()}`;
+                    const quotaKey = `${gName}_${monthKey}`;
+                    
+                    if (!monthlyQuotas[quotaKey]) monthlyQuotas[quotaKey] = 0;
+                    
+                    if (!groupsData[gName]) {
+                        groupsData[gName] = { 
+                            name: gName, totalCalls: 0, aiCalls: 0, forwardedCalls: 0, cost: 0,
+                            parkings: {}
+                        };
+                    }
+                    if (!groupsData[gName].parkings[pName]) {
+                        groupsData[gName].parkings[pName] = { name: pName, totalCalls: 0, aiCalls: 0, forwardedCalls: 0 };
+                    }
+                    
+                    groupsData[gName].totalCalls++;
+                    groupsData[gName].parkings[pName].totalCalls++;
+                    
+                    const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+                    const durationSec = parseInt(c.call_duration || 0);
+                    
+                    if (isForwarded) {
+                        groupsData[gName].forwardedCalls++;
+                        groupsData[gName].parkings[pName].forwardedCalls++;
+                    } else {
+                        groupsData[gName].aiCalls++;
+                        groupsData[gName].parkings[pName].aiCalls++;
+                        
+                        if (monthlyQuotas[quotaKey] >= 100) {
+                            let callCost = (durationSec <= 60) ? ratePerMinute : ratePerMinute + ((durationSec - 60) * ratePerSec);
+                            groupsData[gName].cost += callCost;
+                        } else {
+                            monthlyQuotas[quotaKey]++;
+                        }
+                    }
+                });
+                
+                grid.innerHTML = "";
+                
+                // Populate Filter Dropdown
+                const filterSelect = document.getElementById('finance-filter');
+                const currentFilter = filterSelect.value;
+                let filterOptionsHTML = `<option value="all">כל הקבוצות והחניונים</option>`;
+                
+                const gNames = Object.keys(groupsData).sort();
+                if (gNames.length > 0) {
+                    filterOptionsHTML += `<optgroup label="קבוצות">`;
+                    gNames.forEach(gName => {
+                        filterOptionsHTML += `<option value="group_${gName}">קבוצה: ${gName}</option>`;
+                    });
+                    filterOptionsHTML += `</optgroup>`;
+                }
+                
+                const allParkingsSet = new Set();
+                Object.values(groupsData).forEach(g => {
+                    Object.keys(g.parkings).forEach(p => allParkingsSet.add(p));
+                });
+                const sortedParkingsArr = Array.from(allParkingsSet).sort();
+                
+                if (sortedParkingsArr.length > 0) {
+                    filterOptionsHTML += `<optgroup label="חניונים">`;
+                    sortedParkingsArr.forEach(pName => {
+                        filterOptionsHTML += `<option value="parking_${pName}">חניון: ${pName}</option>`;
+                    });
+                    filterOptionsHTML += `</optgroup>`;
+                }
+                
+                filterSelect.innerHTML = filterOptionsHTML;
+                
+                // Try to restore previous filter if it still exists
+                if (Array.from(filterSelect.options).some(o => o.value === currentFilter)) {
+                    filterSelect.value = currentFilter;
+                }
+                
+                const sortedGroups = Object.values(groupsData).sort((a,b) => b.cost - a.cost);
+                if (sortedGroups.length === 0) {
+                    grid.innerHTML = "<p>אין נתונים לתקופה הנבחרת.</p>";
+                    return;
+                }
+                
+                sortedGroups.forEach(g => {
+                    const card = document.createElement("div");
+                    card.className = "finance-group-card";
+                    card.dataset.groupName = g.name;
+                    // comma separated list of parkings for easy searching
+                    card.dataset.parkings = Object.keys(g.parkings).join(',');
+                    
+                    card.style.cssText = "background: var(--bg-panel); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column;";
+                    
+                    let parkingsHtml = `<div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                                            <h4 style="margin: 0 0 10px 0; color: var(--text-color); font-size: 0.95rem;">פירוט חניונים:</h4>
+                                            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #888; text-align: right;">
+                                                        <th style="padding: 5px;">שם החניון</th>
+                                                        <th style="padding: 5px; text-align: center;">סה"כ</th>
+                                                        <th style="padding: 5px; text-align: center;">מועברות</th>
+                                                        <th style="padding: 5px; text-align: center;">AI</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                    
+                    const sortedParkings = Object.values(g.parkings).sort((a,b) => b.totalCalls - a.totalCalls);
+                    sortedParkings.forEach(p => {
+                        parkingsHtml += `
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 8px 5px; color: var(--text-color);">${p.name}</td>
+                                <td style="padding: 8px 5px; text-align: center;">${p.totalCalls}</td>
+                                <td style="padding: 8px 5px; text-align: center; color: #888;">${p.forwardedCalls}</td>
+                                <td style="padding: 8px 5px; text-align: center; color: #28a745;">${p.aiCalls}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    parkingsHtml += `</tbody></table></div>`;
+                    
+                    card.innerHTML = `
+                        <h3 style="margin-top:0; color: var(--accent-blue); border-bottom: 2px solid var(--bg-body); padding-bottom: 10px; font-size: 1.4rem;">קבוצה: ${g.name}</h3>
+                        <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div style="background: var(--bg-body); padding: 10px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.8rem; color: #888;">סה"כ שיחות</div>
+                                <div style="font-weight: bold; font-size: 1.2rem;">${g.totalCalls}</div>
+                            </div>
+                            <div style="background: var(--bg-body); padding: 10px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.8rem; color: #888;">שיחות מועברות</div>
+                                <div style="font-weight: bold; font-size: 1.2rem;">${g.forwardedCalls}</div>
+                            </div>
+                            <div style="background: var(--bg-body); padding: 10px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.8rem; color: #888;">שיחות AI</div>
+                                <div style="font-weight: bold; font-size: 1.2rem; color: #28a745;">${g.aiCalls}</div>
+                            </div>
+                            <div style="background: rgba(var(--accent-blue-rgb), 0.1); border: 1px solid var(--accent-blue); padding: 10px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.8rem; color: var(--accent-blue);">לתשלום</div>
+                                <div style="font-weight: bold; font-size: 1.4rem; color: var(--text-color);">${g.cost.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₪</div>
+                            </div>
+                        </div>
+                        ${parkingsHtml}
+                    `;
+                    grid.appendChild(card);
+                });
+                
+                applyFinanceFilter();
+                
+            } catch (err) {
+                grid.innerHTML = `<p style="color:red;">שגיאה בטעינת נתונים: ${err.message}</p>`;
+            }
+        }
+        
+        window.onload = initFinancePanel;
+    </script>
+    <div style="position: fixed; bottom: 10px; left: 10px; font-size: 0.75rem; color: var(--text-muted); z-index: 1000; direction: ltr; text-align: left;">
+        &copy; 2026 Human Intelligence &amp; Tech. All rights reserved. | <a href="legal.html" style="color:inherit; text-decoration:underline;">תנאים ומדיניות</a> | גרסה 1.1.6
+    </div>
+</body>
+</html>

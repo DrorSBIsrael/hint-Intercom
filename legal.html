@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HINT LTD - תנאים ומדיניות</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #121212;
+            --bg-surface: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --accent: #bb86fc;
+            --border: #333333;
+            --hover: #2c2c2c;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-surface);
+            border-left: 1px solid var(--border);
+            padding: 40px 20px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo-container h1 {
+            font-size: 1.8rem;
+            color: var(--text-primary);
+            margin: 0;
+            letter-spacing: 2px;
+        }
+        .logo-container p {
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            text-align: right;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--hover);
+            color: var(--text-primary);
+        }
+
+        .nav-btn.active {
+            background-color: rgba(187, 134, 252, 0.1);
+            color: var(--accent);
+            border-right: 4px solid var(--accent);
+            font-weight: 500;
+        }
+
+        .back-btn {
+            margin-top: auto;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            margin-right: 290px; /* sidebar width + padding */
+            padding: 60px 40px;
+            max-width: 900px;
+        }
+
+        .tab-section {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .tab-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 2.2rem;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 15px;
+            margin-top: 0;
+            margin-bottom: 30px;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            color: var(--accent);
+            margin-top: 40px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            line-height: 1.8;
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        ul {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            font-size: 1.05rem;
+            padding-right: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                position: static;
+                border-left: none;
+                border-bottom: 1px solid var(--border);
+                padding: 20px;
+                box-sizing: border-box;
+            }
+            .main-content {
+                margin-right: 0;
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo-container">
+            <h1>HINT LTD</h1>
+            <p>תנאים ומדיניות</p>
+        </div>
+        <button class="nav-btn active" onclick="switchTab('terms')">תנאי שימוש</button>
+        <button class="nav-btn" onclick="switchTab('privacy')">מדיניות פרטיות</button>
+        <button class="nav-btn" onclick="switchTab('security')">מדיניות תוכנה ואבטחה</button>
+        
+        <button class="nav-btn back-btn" onclick="window.history.back()">🔙 חזרה למערכת</button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        
+        <!-- Terms of Use -->
+        <div id="terms" class="tab-section active">
+            <h2>תנאי שימוש (Terms of Use)</h2>
+            <p>ברוכים הבאים למערכת ניהול החניונים החכמה מבית <strong>HINT LTD</strong>. שימוש במערכת מהווה הסכמה מלאה לתנאים המפורטים להלן.</p>
+            
+            <h3>1. הגדרת השירות</h3>
+            <p>חברת HINT LTD מספקת מערכת ענן (SaaS) לניהול אינטרקום, פתיחת שערים וניהול חניונים באמצעות בינה מלאכותית (AI). המערכת מאפשרת קליטת קריאות, ניתוב שיחות למוקד או לבינה המלאכותית, וניהול בסיסי נתונים של מורשים (רשימה לבנה) וחסומים (רשימה שחורה).</p>
+            
+            <h3>2. מתן השירות "כפי שהוא" (As-Is Liability)</h3>
+            <p>המערכת ניתנת לשימוש במתכונת "As-Is". חברת HINT LTD משקיעה מאמצים רבים על מנת להבטיח את רציפות ותקינות השירות, אך אינה מתחייבת שהשירות יהיה חסין מפני הפרעות, תקלות, השבתות או פריצות זדוניות. החברה לא תישא באחריות לכל נזק, ישיר או עקיף, שייגרם כתוצאה משימוש או מאי-יכולת להשתמש במערכת, לרבות אובדן הכנסות, עיכוב בכניסת רכבים לחניון או תקלות חומרה בשערי החניון.</p>
+
+            <h3>3. מחויבות לתיקון תקלות (SLA)</h3>
+            <p>למרות מגבלות האחריות, אנו ב-HINT LTD מחויבים לספק שירות איכותי ללקוחותינו. צוות הפיתוח והתמיכה שלנו מתחייב לפעול במהירות האפשרית לתיקון כל באג או תקלה טכנית שמתגלה במערכת, תוך שקיפות ועדכון שוטף של מנהלי החניון.</p>
+
+            <h3>4. עדכונים ושינויים</h3>
+            <p>HINT LTD שומרת לעצמה את הזכות לעדכן, לשדרג או לשנות את מאפייני המערכת מעת לעת ללא הודעה מוקדמת, במטרה לשפר את איכות השירות.</p>
+        </div>
+
+        <!-- Privacy Policy -->
+        <div id="privacy" class="tab-section">
+            <h2>מדיניות פרטיות (Privacy Policy)</h2>
+            <p>אנו ב-HINT LTD מייחסים חשיבות עליונה לפרטיות המשתמשים ומנהלי החניון. מסמך זה מפרט אילו נתונים נאספים וכיצד נעשה בהם שימוש.</p>
+
+            <h3>1. איסוף מידע תפעולי בלבד</h3>
+            <p>המערכת אוספת ושומרת אך ורק מידע הנחוץ לפעילותו התקינה של החניון ולצורך מתן השירותים. המידע הנאסף כולל:</p>
+            <ul>
+                <li><strong>מספרי רכבים (לוחיות רישוי):</strong> לצורך זיהוי ופתיחת שערים אוטומטית (רשימות לבנות ושחורות).</li>
+                <li><strong>שמות נהגים או דיירים:</strong> לצרכי זיהוי על ידי הבינה המלאכותית ולצורך ניהול פנימי של החניון.</li>
+                <li><strong>יומני שיחות (Call Logs):</strong> תיעוד זמני השיחות, משך השיחה, ותוצאת הפעולה (פתיחת שער, העברה למוקד וכו').</li>
+                <li><strong>תמלילי שיחות קוליות (Transcriptions):</strong> שיחות המתבצעות מול מערכת הבינה המלאכותית מתומללות ונשמרות במטרה לשפר את מודל השפה, לאפשר בקרה למנהלי החניון ולהבטיח איכות שירות.</li>
+            </ul>
+
+            <h3>2. שימוש במידע</h3>
+            <p>המידע משמש באופן בלעדי לתפעול המערכת, לאבטחת החניון, להפקת דוחות (כגון חיובים פיננסיים על שיחות AI) ולשיפור טכנולוגיית הזיהוי הקולי שלנו. HINT LTD אינה מוכרת, סוחרת או מעבירה מידע זה לצדדים שלישיים ללא הסכמה מפורשת, למעט במקרים בהם נדרש הדבר על פי חוק או צו בית משפט.</p>
+
+            <h3>3. אבטחת מידע</h3>
+            <p>אנו מיישמים אמצעי אבטחה טכנולוגיים מתקדמים כדי להגן על הנתונים השמורים במסדי הנתונים שלנו מפני גישה בלתי מורשית, שינוי, חשיפה או השמדה.</p>
+        </div>
+
+        <!-- Software & Security Policy -->
+        <div id="security" class="tab-section">
+            <h2>מדיניות תוכנה ואבטחה (Software & Security)</h2>
+            <p>פרק זה מגדיר את הזכויות המשפטיות על התוכנה ואת מגבלות האבטחה והגישה.</p>
+
+            <h3>1. קניין רוחני (Intellectual Property)</h3>
+            <p>כל זכויות הקניין הרוחני, לרבות זכויות יוצרים, קוד המקור, אלגוריתמים, מודלים של בינה מלאכותית, ממשקי משתמש (UI/UX) וסימני המסחר הקשורים למערכת, שייכים באופן בלעדי ל-<strong>HINT LTD</strong>. קבלת גישה למערכת מקנה רישיון שימוש מוגבל ובלתי עביר בלבד, ואינה מהווה מכירה של התוכנה.</p>
+
+            <h3>2. איסור הנדסה לאחור (Reverse Engineering)</h3>
+            <p>חל איסור מוחלט על ביצוע הנדסה לאחור (Reverse Engineering), פירוק (Decompilation), העתקת קוד מקור, או ניסיון לעקוף את מנגנוני האבטחה של התוכנה. כל פעולה כזו תגרור ביטול מיידי של הגישה למערכת ונקיטת צעדים משפטיים מחמירים.</p>
+
+            <h3>3. ניהול הרשאות ואיפוסי סיסמה</h3>
+            <p>כחלק ממדיניות האבטחה הקפדנית שלנו, איפוסי סיסמה ופעולות הגדרת משתמשים בעלי הרשאות גבוהות במערכת מבוצעים <strong>אך ורק על ידי מנהלים מורשים מטעם HINT LTD</strong>.</p>
+            <ul>
+                <li>מנהלי חניון או בעלי תפקידים אינם רשאים ואינם יכולים לאפס סיסמאות בכוחות עצמם.</li>
+                <li>לצורך איפוס סיסמה או שינוי הרשאות מערכת קריטיות, יש לפנות לשירות הלקוחות או לתמיכה הטכנית של החברה. הדבר נועד למנוע השתלטות עוינת על חשבונות רגישים השולטים בשערי כניסה ומערכות ביטחון.</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script>
+        function switchTab(tabId) {
+            // Update buttons
+            const buttons = document.querySelectorAll('.nav-btn:not(.back-btn)');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update sections
+            const sections = document.querySelectorAll('.tab-section');
+            sections.forEach(sec => sec.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+    </script>
+</body>
+</html>
