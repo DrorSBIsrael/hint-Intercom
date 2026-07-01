@@ -71,12 +71,12 @@ const langDropdownBtn = document.getElementById('current-lang-btn');
 const langDropdownMenu = document.getElementById('lang-dropdown-menu');
 
 if (langDropdownBtn && langDropdownMenu) {
-    langDropdownBtn?.addEventListener('click', (e) => {
+    langDropdownBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         langDropdownMenu.classList.toggle('hidden');
     });
     
-    document?.addEventListener('click', () => {
+    document.addEventListener('click', () => {
         if (!langDropdownMenu.classList.contains('hidden')) {
             langDropdownMenu.classList.add('hidden');
         }
@@ -86,7 +86,7 @@ if (langDropdownBtn && langDropdownMenu) {
 document.querySelectorAll('.lang-btn').forEach(btn => {
     // Only bind to elements that actually have data-lang to change it
     if(btn.id !== 'current-lang-btn') {
-        btn?.addEventListener('click', (e) => {
+        btn.addEventListener('click', (e) => {
             const lang = e.target.getAttribute('data-lang');
             if (lang) {
                 currentLang = lang;
@@ -116,6 +116,16 @@ function initAudioContext() {
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
+        
+        // Play silent sound to unlock audio engine
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.01);
+
         audioCtxInitialized = true;
         ['click', 'touchstart', 'keydown'].forEach(evt => {
             document.removeEventListener(evt, initAudioContext);
@@ -124,7 +134,7 @@ function initAudioContext() {
 }
 
 ['click', 'touchstart', 'keydown'].forEach(evt => {
-    document?.addEventListener(evt, initAudioContext);
+    document.addEventListener(evt, initAudioContext);
 });
 
 function playNotificationSound() {
@@ -135,23 +145,25 @@ function playNotificationSound() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     
-    // Attempt to resume if suspended (may fail if no interaction yet, but we tried)
+    // Attempt to resume if suspended
     if (audioCtx.state === 'suspended') {
         audioCtx.resume().catch(e => console.warn("AudioContext resume failed:", e));
     }
     
     function playTone(freq, duration, type='sine', vol=0.2) {
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        osc.type = type;
-        osc.frequency.value = freq;
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.02);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        try {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gainNode.gain.value = vol; // Static volume
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {
+            console.warn("playTone error:", e);
+        }
     }
 
     const soundType = document.getElementById('sound-select')?.value || '1';
@@ -178,8 +190,13 @@ function playNotificationSound() {
 document.getElementById('sound-toggle-btn')?.addEventListener('click', (e) => {
     isSoundEnabled = !isSoundEnabled;
     localStorage.setItem('intercom_pref_sound_enabled', isSoundEnabled);
-    e.target.innerText = isSoundEnabled ? '🔊' : '🔇';
-    e.target.style.opacity = isSoundEnabled ? '1' : '0.7';
+    
+    const soundWaves = document.getElementById('sound-waves');
+    const soundMuteLine = document.getElementById('sound-mute-line');
+    if (soundWaves) soundWaves.style.display = isSoundEnabled ? 'block' : 'none';
+    if (soundMuteLine) soundMuteLine.style.display = isSoundEnabled ? 'none' : 'block';
+    
+    e.currentTarget.style.opacity = isSoundEnabled ? '1' : '0.7';
     
     const soundSelect = document.getElementById('sound-select');
     if (soundSelect) {
@@ -289,7 +306,7 @@ if (loginForm) {
         }
     }
 
-    if (loginForm) loginForm?.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = document.getElementById('username').value.trim();
     const pass = document.getElementById('password').value.trim();
@@ -347,7 +364,7 @@ const twoFaError = document.getElementById('two-fa-error');
 
 if (codeInputs.length > 0) {
     codeInputs.forEach((input, index) => {
-        input?.addEventListener('input', (e) => {
+        input.addEventListener('input', (e) => {
         // Allow only numbers
         input.value = input.value.replace(/[^0-9]/g, '');
         
@@ -363,7 +380,7 @@ if (codeInputs.length > 0) {
     });
 
     // Handle backspace
-    input?.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', (e) => {
         if (e.key === 'Backspace' && input.value === '' && index > 0) {
             codeInputs[index - 1].focus();
         }
@@ -395,7 +412,8 @@ function checkTwoFaCode() {
                 if (data.role === 'admin' || data.role === 'owner' || data.role === 'manager') {
                     window.location.href = 'owner_dashboard.html';
                 } else {
-                    window.location.href = 'operator_dashboard.html';
+                    initDashboard();
+                    showScreen('dashboard-screen');
                 }
             } else {
                 twoFaError.innerText = data.error || "קוד אימות שגוי";
@@ -417,7 +435,7 @@ document.getElementById('close-2fa-btn')?.addEventListener('click', () => {
     if (twoFaError) twoFaError.innerText = '';
 });
 
-document?.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', (e) => {
     const twoFaScreen = document.getElementById('two-fa-screen');
     if (e.key === 'Escape' && twoFaScreen && twoFaScreen.classList.contains('active')) {
         twoFaScreen.classList.remove('active');
@@ -436,7 +454,7 @@ const appBody = document.getElementById('app-body');
 
 let baseFontSize = 16;
 
-themeToggle?.addEventListener('click', () => {
+themeToggle.addEventListener('click', () => {
     if (appBody.classList.contains('dark-mode')) {
         appBody.classList.remove('dark-mode');
         appBody.classList.add('light-mode');
@@ -448,21 +466,21 @@ themeToggle?.addEventListener('click', () => {
     }
 });
 
-fontIncrease?.addEventListener('click', () => {
+fontIncrease.addEventListener('click', () => {
     if (baseFontSize < 24) {
         baseFontSize += 2;
         appBody.style.setProperty('--base-font-size', `${baseFontSize}px`);
     }
 });
 
-fontDecrease?.addEventListener('click', () => {
+fontDecrease.addEventListener('click', () => {
     if (baseFontSize > 12) {
         baseFontSize -= 2;
         appBody.style.setProperty('--base-font-size', `${baseFontSize}px`);
     }
 });
 
-const logoutBtn = document.getElementById('logout-btn'); if(logoutBtn) logoutBtn?.addEventListener('click', () => {
+document.getElementById('logout-btn').addEventListener('click', () => {
     // Clear 2FA inputs
     if (typeof codeInputs !== 'undefined') codeInputs.forEach(i => i.value = '');
     const uname = document.getElementById('username');
@@ -473,7 +491,7 @@ const logoutBtn = document.getElementById('logout-btn'); if(logoutBtn) logoutBtn
     sessionStorage.removeItem('intercom_session_token');
     sessionStorage.removeItem('intercom_user_role');
     
-    if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker') || document.getElementById('operator-dashboard-marker')) {
+    if (document.getElementById('owner-dashboard-marker')) {
         window.location.href = 'index.html';
     } else {
         showScreen('login-screen');
@@ -483,6 +501,44 @@ const logoutBtn = document.getElementById('logout-btn'); if(logoutBtn) logoutBtn
 // ----------------------------------------------------
 // Dashboard Logic & Data Fetching
 // ----------------------------------------------------
+
+async function pollOperatorCallsFast() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/operator_calls?t=${Date.now()}`);
+        if (!res.ok) return;
+        let opCalls = await res.json();
+        opCalls = filterDataByAllowedParkings(opCalls);
+        
+        let shouldUpdate = false;
+        
+        opCalls.forEach(opCall => {
+            const existingIdx = allCalls.findIndex(c => String(c.id) === String(opCall.id));
+            if (existingIdx === -1) {
+                // Completely new call
+                opCall.isNew = true;
+                allCalls.unshift(opCall);
+                shouldUpdate = true;
+            } else {
+                // Exists, check if it just became forwarded
+                const oldCall = allCalls[existingIdx];
+                if (String(oldCall.is_forwarded).toLowerCase() !== 'true') {
+                    opCall.isNew = true;
+                    allCalls[existingIdx] = opCall;
+                    shouldUpdate = true;
+                }
+            }
+        });
+        
+        if (shouldUpdate) {
+            allCalls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            playNotificationSound();
+            applyFilters();
+        }
+    } catch (e) {
+        console.error("Fast polling error:", e);
+    }
+}
+
 
 
 function filterDataByAllowedParkings(dataArray) {
@@ -510,91 +566,107 @@ async function fetchInitialCalls() {
         
         newCalls = filterDataByAllowedParkings(newCalls);
 
-
-
-            if (allCalls.length === 0 || newCalls.length !== allCalls.length || newCalls[0].id !== allCalls[0].id) {
-                const hasNewCall = allCalls.length > 0 && newCalls.length > 0 && newCalls[0].id !== allCalls[0].id;
-                const latestCall = newCalls[0];
-                
-                if (hasNewCall) {
-                    const oldLatestId = allCalls[0].id;
-                    for (let i = 0; i < newCalls.length; i++) {
-                        if (newCalls[i].id === oldLatestId) break;
-                        newCalls[i].isNew = true;
+            let playSound = false;
+            
+            if (allCalls.length === 0) {
+                allCalls = newCalls;
+            } else {
+                // Check if any call is new or became forwarded
+                if (newCalls.length > 0 && newCalls[0].id !== allCalls[0].id) {
+                    if (String(newCalls[0].is_forwarded).toLowerCase() === 'true') {
+                        playSound = true;
                     }
+                } else {
+                    // Check top 10 for updates to is_forwarded
+                    for (let i = 0; i < Math.min(newCalls.length, 10); i++) {
+                        const nc = newCalls[i];
+                        const oc = allCalls.find(c => c.id === nc.id);
+                        if (oc && String(oc.is_forwarded).toLowerCase() === 'false' && String(nc.is_forwarded).toLowerCase() === 'true') {
+                            nc.isNew = true;
+                            playSound = true;
+                            // continue checking others just in case, but one playSound is enough
+                        }
+                    }
+                }
+                
+                // Keep 'isNew' tag for UI animation
+                const oldLatestId = allCalls[0].id;
+                for (let i = 0; i < newCalls.length; i++) {
+                    if (newCalls[i].id === oldLatestId) break;
+                    newCalls[i].isNew = true;
                 }
                 
                 allCalls = newCalls;
-                updateActionsDatalist();
-                
-                const role = sessionStorage.getItem('intercom_user_role');
-                const allowedParkingsStr = sessionStorage.getItem('intercom_allowed_parkings');
-                let allowedParkings = [];
-                if (allowedParkingsStr) {
-                    try { allowedParkings = JSON.parse(allowedParkingsStr); } catch(e) {}
+            }
+            
+            const role = sessionStorage.getItem('intercom_user_role');
+            const allowedParkingsStr = sessionStorage.getItem('intercom_allowed_parkings');
+            let allowedParkings = [];
+            if (allowedParkingsStr) {
+                try { allowedParkings = JSON.parse(allowedParkingsStr); } catch(e) {}
+            }
+            const allowedStr = allowedParkings.map(p => String(p.id || p));
+            
+            const parkingSelect = document.getElementById('parking-selector');
+            if (parkingSelect && parkingSelect.options.length <= 1) {
+                // Include both allowed parkings and lots from calls to ensure we show all options
+                let lots = [...new Set(allCalls.map(c => c.parking_id))].filter(Boolean);
+                if (role !== 'admin' && allowedParkings.length > 0) {
+                    lots = [...new Set([...lots, ...allowedStr])].filter(Boolean);
                 }
-                const allowedStr = allowedParkings.map(p => String(p.id || p));
                 
-                const parkingSelect = document.getElementById('parking-selector');
-                if (parkingSelect && parkingSelect.options.length <= 1) {
-                    // Include both allowed parkings and lots from calls to ensure we show all options
-                    let lots = [...new Set(allCalls.map(c => c.parking_id))].filter(Boolean);
-                    if (role !== 'admin' && allowedParkings.length > 0) {
-                        lots = [...new Set([...lots, ...allowedStr])].filter(Boolean);
-                    }
-                    
-                    parkingSelect.innerHTML = '';
-                    if (lots.length > 1 || role === 'admin') {
-                        parkingSelect.innerHTML = '<option value="all">כל החניונים</option>';
-                    }
-                    
-                    lots.forEach(lot => {
-                        const opt = document.createElement('option');
-                        opt.value = lot;
-                        
-                        let lotName = "";
-                        const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
-                        if (matchingParking && matchingParking.name) {
-                            lotName = ` - ${matchingParking.name}`;
-                        }
-                        
-                        opt.innerText = `חניון ${lot}${lotName}`;
-                        if (lot === currentParkingId || lots.length === 1) {
-                            opt.selected = true;
-                            currentParkingId = lot; // Auto-select if only 1 option
-                        }
-                        parkingSelect.appendChild(opt);
-                    });
-                    
-                    const displaySpan = document.getElementById('selected-parking-display');
-                    if (displaySpan) {
-                        displaySpan.innerText = parkingSelect.options[parkingSelect.selectedIndex].text;
-                    }
+                parkingSelect.innerHTML = '';
+                if (lots.length > 1 || role === 'admin') {
+                    parkingSelect.innerHTML = '<option value="all">כל החניונים</option>';
+                }
                 
-                // Populate owner list forms if present
-                document.querySelectorAll('.owner-parking-select').forEach(sel => {
-                    sel.innerHTML = '<option value="">בחר חניון (חובה)</option>';
-                    lots.forEach(lot => {
-                        const opt = document.createElement('option');
-                        opt.value = lot;
-                        let lotName = "";
-                        const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
-                        if (matchingParking && matchingParking.name) {
-                            lotName = ` - ${matchingParking.name}`;
-                        }
-                        opt.innerText = `חניון ${lot}${lotName}`;
-                        sel.appendChild(opt);
-                    });
+                lots.forEach(lot => {
+                    const opt = document.createElement('option');
+                    opt.value = lot;
+                    
+                    let lotName = "";
+                    const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
+                    if (matchingParking && matchingParking.name) {
+                        lotName = ` - ${matchingParking.name}`;
+                    }
+                    
+                    opt.innerText = `חניון ${lot}${lotName}`;
+                    if (lot === currentParkingId || lots.length === 1) {
+                        opt.selected = true;
+                        currentParkingId = lot; // Auto-select if only 1 option
+                    }
+                    parkingSelect.appendChild(opt);
                 });
-            }
+                
+                const displaySpan = document.getElementById('selected-parking-display');
+                if (displaySpan) {
+                    displaySpan.innerText = parkingSelect.options[parkingSelect.selectedIndex].text;
+                }
             
-            applyFilters();
-            calculateAICosts(allCalls);
-            
-            // Play notification sound if there is a new call, BUT ONLY IF forwarded to operator
-            if (hasNewCall && latestCall.is_forwarded === 'true') {
-                playNotificationSound();
-            }
+            // Populate owner list forms if present
+            document.querySelectorAll('.owner-parking-select').forEach(sel => {
+                sel.innerHTML = '<option value="">בחר חניון (חובה)</option>';
+                lots.forEach(lot => {
+                    const opt = document.createElement('option');
+                    opt.value = lot;
+                    let lotName = "";
+                    const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
+                    if (matchingParking && matchingParking.name) {
+                        lotName = ` - ${matchingParking.name}`;
+                    }
+                    opt.innerText = `חניון ${lot}${lotName}`;
+                    sel.appendChild(opt);
+                });
+            });
+        }
+        
+        populateActionDbDropdown(allCalls);
+        
+        applyFilters();
+        calculateAICosts(allCalls);
+        
+        if (playSound && !isInitialLoad) {
+            playNotificationSound();
         }
     } catch (e) {
         console.error("Failed to poll CSV", e);
@@ -613,9 +685,9 @@ async function initDashboard() {
             
             supabaseClient
               .channel('realtime-calls')
-              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls' }, payload => {
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, payload => {
                 const newCall = payload.new;
-                newCall.isNew = true;
+                if (!newCall) return; // handles DELETE where payload.new is null
                 
                 // Convert booleans to strings to match existing logic if needed
                 if (typeof newCall.is_forwarded === 'boolean') {
@@ -625,17 +697,41 @@ async function initDashboard() {
                 // Check permissions before adding
                 if (filterDataByAllowedParkings([newCall]).length === 0) return;
 
-                // Add to start of array
-                allCalls.unshift(newCall);
+                if (payload.eventType === 'INSERT') {
+                    newCall.isNew = true;
+                    // Add to start of array
+                    allCalls.unshift(newCall);
+                    
+                    // Play notification sound ONLY if it's forwarded to the operator
+                    if (String(newCall.is_forwarded).toLowerCase() === 'true') {
+                        playNotificationSound();
+                    }
+                } else if (payload.eventType === 'UPDATE') {
+                    const existingIdx = allCalls.findIndex(c => String(c.id) === String(newCall.id));
+                    if (existingIdx !== -1) {
+                        const oldCall = allCalls[existingIdx];
+                        const wasForwarded = String(oldCall.is_forwarded).toLowerCase() === 'true';
+                        const isNowForwarded = String(newCall.is_forwarded).toLowerCase() === 'true';
+                        
+                        allCalls[existingIdx] = newCall;
+                        
+                        // If it changed from NOT forwarded to forwarded, play the sound!
+                        if (!wasForwarded && isNowForwarded) {
+                            newCall.isNew = true;
+                            playNotificationSound();
+                        }
+                    } else {
+                        // Not in list yet, treat as insert
+                        allCalls.unshift(newCall);
+                        if (String(newCall.is_forwarded).toLowerCase() === 'true') {
+                            playNotificationSound();
+                        }
+                    }
+                }
                 
                 // Apply filters & update UI
                 applyFilters();
                 calculateAICosts(allCalls);
-                
-                // Play notification sound ONLY if it's forwarded to the operator
-                if (newCall.is_forwarded === 'true') {
-                    playNotificationSound();
-                }
               })
               .subscribe();
               
@@ -646,7 +742,10 @@ async function initDashboard() {
     }
     
     // Always fallback to polling to guarantee updates even if realtime drops
-    setInterval(fetchInitialCalls, 3000);
+    setInterval(fetchInitialCalls, 30000);
+    
+    // Aggressive fast polling for operator calls ONLY (every 3 seconds)
+    setInterval(pollOperatorCallsFast, 3000);
     
     // Setup owner forms and polling
     setupOwnerListForms();
@@ -654,7 +753,7 @@ async function initDashboard() {
         setInterval(() => {
             fetchAndRenderActionList('blocked');
             fetchAndRenderActionList('authorized');
-        }, 5000);
+        }, 30000);
         
         // Initial fetch
         fetchAndRenderActionList('blocked');
@@ -676,15 +775,7 @@ function loadPreferences() {
         currentParkingId = savedParking;
     }
 
-    const savedStatsTimeframe = localStorage.getItem('intercom_pref_stats_timeframe');
-    if (savedStatsTimeframe && document.getElementById('stats-timeframe')) {
-        document.getElementById('stats-timeframe').value = savedStatsTimeframe;
-    }
-
-    const savedGraphTimeframe = localStorage.getItem('intercom_pref_graph_timeframe');
-    if (savedGraphTimeframe && document.getElementById('graph-timeframe')) {
-        document.getElementById('graph-timeframe').value = savedGraphTimeframe;
-    }
+    // Timeframe preferences intentionally not loaded, defaults to today/24h
 
     const savedTheme = localStorage.getItem('intercom_pref_theme');
     if (savedTheme && document.getElementById('app-body')) {
@@ -695,11 +786,16 @@ function loadPreferences() {
 
     const savedSoundEnabled = localStorage.getItem('intercom_pref_sound_enabled');
     if (savedSoundEnabled !== null) {
-        isSoundEnabled = savedSoundEnabled === 'true';
+        // ALWAYS force sound to true since owner dashboard has no toggle
+        isSoundEnabled = true;
+        localStorage.setItem('intercom_pref_sound_enabled', 'true');
         const soundBtn = document.getElementById('sound-toggle-btn');
         if (soundBtn) {
-            soundBtn.innerText = isSoundEnabled ? '🔊' : '🔇';
             soundBtn.style.opacity = isSoundEnabled ? '1' : '0.7';
+            const soundWaves = document.getElementById('sound-waves');
+            const soundMuteLine = document.getElementById('sound-mute-line');
+            if (soundWaves) soundWaves.style.display = isSoundEnabled ? 'block' : 'none';
+            if (soundMuteLine) soundMuteLine.style.display = isSoundEnabled ? 'none' : 'block';
         }
         const soundSelect = document.getElementById('sound-select');
         if (soundSelect) {
@@ -724,10 +820,9 @@ function applyFilters() {
     updateStatistics();
     updateRecentCalls();
     renderPopularTimes();
-    const searchEl = document.getElementById('global-search');
-    if (searchEl) {
-        updateTable(searchEl.value.trim());
-    }
+    
+    updateTable();
+    
     if (typeof updateGraph === 'function') {
         try { updateGraph(); } catch(e){}
     }
@@ -737,13 +832,16 @@ function applyFilters() {
         fetchAndRenderActionList('blocked');
         fetchAndRenderActionList('authorized');
     }
+    
+    setTimeout(() => {
+        allCalls.forEach(c => { c.isNew = false; });
+    }, 3100); // Wait until animations finish
 }
 
 // ----------------------------------------------------
 // UI Updates
 // ----------------------------------------------------
 document.getElementById('stats-timeframe')?.addEventListener('change', (e) => {
-    localStorage.setItem('intercom_pref_stats_timeframe', e.target.value);
     const customContainer = document.getElementById('custom-date-range');
     const loader = document.getElementById('global-loader');
     
@@ -780,6 +878,10 @@ document.getElementById('apply-custom-date')?.addEventListener('click', () => {
     });
 });
 
+document.getElementById('ai-cost-timeframe')?.addEventListener('change', () => {
+    calculateAICosts(allCalls);
+});
+
 function getStatsCalls() {
     const timeframeEl = document.getElementById('stats-timeframe');
     if (!timeframeEl) return filteredCalls;
@@ -814,11 +916,10 @@ function getStatsCalls() {
     } else if (timeframe === 'custom') {
         const startVal = document.getElementById('custom-start-date')?.value;
         const endVal = document.getElementById('custom-end-date')?.value;
-        if (startVal && endVal && startVal.length === 10 && endVal.length === 10) {
-            const [sd, sm, sy] = startVal.split('/');
-            const [ed, em, ey] = endVal.split('/');
-            const startD = new Date(`${sy}-${sm}-${sd}T00:00:00`);
-            const endD = new Date(`${ey}-${em}-${ed}T23:59:59`);
+        if (startVal && endVal) {
+            const startD = new Date(startVal);
+            startD.setHours(0, 0, 0, 0);
+            const endD = new Date(endVal);
             endD.setHours(23, 59, 59, 999);
             statsCalls = filteredCalls.filter(c => {
                 const d = new Date(c.created_at);
@@ -880,54 +981,38 @@ function updateStatistics() {
     window.animateValue('stat-ai-calls', aiCalls.length, (val) => `${Math.floor(val)} <span style="font-size: 0.75em; margin-right: 5px;">${aiPercent}%</span>`);
     window.animateValue('stat-op-calls', opCalls.length, (val) => `${Math.floor(val)} <span style="font-size: 0.75em; margin-right: 5px;">${opPercent}%</span>`);
     
-    let entranceCount = 0;
-    let exitCount = 0;
+    const laneCounts = { entries: {}, exits: {} };
     statsCalls.forEach(c => {
-        const text = ((c.request_summary || '') + ' ' + (c.actions_taken || '')).toLowerCase();
-        if (text.includes('כניס') || text.includes('נכנס')) {
-            entranceCount++;
-        } else if (text.includes('יציא') || text.includes('שיצא')) {
-            exitCount++;
+        const lane = c.lane_id;
+        if (lane) {
+            if (lane.toString().startsWith('1')) {
+                laneCounts.entries[lane] = (laneCounts.entries[lane] || 0) + 1;
+            } else {
+                laneCounts.exits[lane] = (laneCounts.exits[lane] || 0) + 1;
+            }
         }
     });
-    const entPercent = totalCallsCount ? Math.round((entranceCount / totalCallsCount) * 100) : 0;
-    const exitPercent = totalCallsCount ? Math.round((exitCount / totalCallsCount) * 100) : 0;
-    
-    const entEl = document.getElementById('stat-entrance-calls');
-    const exitEl = document.getElementById('stat-exit-calls');
-    if (entEl && exitEl) {
-        window.animateValue('stat-entrance-calls', entranceCount, (val) => `${Math.floor(val)} (${entPercent}%)`);
-        window.animateValue('stat-exit-calls', exitCount, (val) => `${Math.floor(val)} (${exitPercent}%)`);
-    }
-    
-    // Group lanes
-    const entranceLanes = {};
-    const exitLanes = {};
-    
-    statsCalls.forEach(c => {
-        if (!c.lane_id) return;
-        const laneStr = String(c.lane_id).trim();
-        if (laneStr.startsWith('10')) {
-            entranceLanes[laneStr] = (entranceLanes[laneStr] || 0) + 1;
-        } else if (laneStr.startsWith('20')) {
-            exitLanes[laneStr] = (exitLanes[laneStr] || 0) + 1;
-        }
-    });
-    
-    const formatLanes = (lanesObj, prefix) => {
-        const sorted = Object.entries(lanesObj).sort((a,b) => b[1] - a[1]);
-        if (sorted.length === 0) return 'אין נתונים';
-        return sorted.map(([lane, count]) => `<div style="white-space: nowrap;">${prefix} ${lane}: <b>${count}</b> שיחות</div>`).join('');
-    };
-    
-    const topEntrancesEl = document.getElementById('stat-top-entrances');
-    const topExitsEl = document.getElementById('stat-top-exits');
-    
-    if (topEntrancesEl) {
-        topEntrancesEl.innerHTML = formatLanes(entranceLanes, 'כניסה');
-    }
-    if (topExitsEl) {
-        topExitsEl.innerHTML = formatLanes(exitLanes, 'יציאה');
+
+    const lanesContainer = document.getElementById('lanes-distribution-container');
+    if (lanesContainer) {
+        const entriesHtml = Object.entries(laneCounts.entries)
+            .sort((a,b) => a[0].localeCompare(b[0]))
+            .map(([lane, count]) => `<div style="margin-bottom: 4px;">כניסה ${lane} - ${count} שיחות</div>`)
+            .join('');
+            
+        const exitsHtml = Object.entries(laneCounts.exits)
+            .sort((a,b) => a[0].localeCompare(b[0]))
+            .map(([lane, count]) => `<div style="margin-bottom: 4px;">יציאה ${lane} - ${count} שיחות</div>`)
+            .join('');
+
+        lanesContainer.innerHTML = `
+            <div style="color: #e67e22; display: flex; flex-direction: column; flex: 1;">
+                ${entriesHtml || '<div style="font-weight: normal; font-size: 0.8em; opacity: 0.7;">אין נתונים</div>'}
+            </div>
+            <div style="color: #9b59b6; display: flex; flex-direction: column; text-align: left; flex: 1;">
+                ${exitsHtml || '<div style="font-weight: normal; font-size: 0.8em; opacity: 0.7;">אין נתונים</div>'}
+            </div>
+        `;
     }
 
     function getExpectedPeakHours(allCallsArray, refDate) {
@@ -1010,14 +1095,47 @@ function updateStatistics() {
         }
     }
     
+    const avgDurationEl = document.getElementById('stat-avg-duration');
+    if (avgDurationEl) {
+        if (allCalls && allCalls.length > 0) {
+            let allParkingCalls = allCalls;
+            if (currentParkingId !== 'all') {
+                allParkingCalls = allCalls.filter(c => String(c.parking_id) === String(currentParkingId));
+            }
+            
+            const avgSeconds = getAverageStayTime(allParkingCalls);
+            
+            if (avgSeconds) {
+                const m = Math.floor(avgSeconds / 60);
+                const h = Math.floor(m / 60);
+                const remM = m % 60;
+                let timeStr = "";
+                if (h > 0) {
+                    timeStr = `${h} שעות ו-${remM} דק'`;
+                } else {
+                    timeStr = `${m} דק'`;
+                }
+                avgDurationEl.innerText = timeStr;
+            } else {
+                avgDurationEl.innerText = 'אין מספיק נתונים';
+            }
+        } else {
+            avgDurationEl.innerText = '--';
+        }
+    }
+    
     const aiTotalTime = aiCalls.reduce((acc, c) => acc + parseInt(c.call_duration || 0), 0);
     const opTotalTime = opCalls.reduce((acc, c) => acc + parseInt(c.call_duration || 0), 0);
     
     function formatTime(seconds) {
-        if (seconds < 60) return `${seconds}s`;
-        const m = Math.floor(seconds / 60);
+        if (!seconds || seconds < 0) seconds = 0;
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
         const s = seconds % 60;
-        return `${m}m ${s}s`;
+        const hh = String(h).padStart(2, '0');
+        const mm = String(m).padStart(2, '0');
+        const ss = String(s).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
     }
     
     window.animateValue('stat-ai-avg', aiTotalTime, (val) => formatTime(Math.floor(val)));
@@ -1053,16 +1171,10 @@ function updateRecentCalls() {
             const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
             const dateStr = date.toLocaleDateString('he-IL');
             
-            const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:var(--accent-blue);">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
-            const summary = c.request_summary || '';
-            const action = c.actions_taken || '';
-            let reasonHtml = '';
-            if (summary) {
-                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--text-muted);"><span style="color: var(--text-color); font-weight: 600;">בקשה:</span> ${summary}</div>`;
-            }
-            if (action) {
-                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 4px; color: var(--accent-blue);"><span style="font-weight: 600;">פעולה:</span> ${action}</div>`;
-            }
+            const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:#00d2ff;">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
+            const req = c.request_summary || '-';
+            const act = c.actions_taken || '-';
+            const reasonHtml = ` <div style="font-weight: normal; font-size: 0.81em; margin-top: 5px;"><strong style="color: orange;">בקשה:</strong> <span style="color: gray;">${req}</span><br><strong style="color: gray;">פעולה:</strong> <span style="color: gray;">${act}</span></div>`;
             
             aiList.innerHTML += `
                 <li class="call-item ${animClass}">
@@ -1073,8 +1185,6 @@ function updateRecentCalls() {
                     </div>
                 </li>
             `;
-            // Remove the flag so it only pulses once
-            c.isNew = false;
         });
     }
     
@@ -1089,18 +1199,10 @@ function updateRecentCalls() {
             const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
             const dateStr = date.toLocaleDateString('he-IL');
             
-            const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:var(--accent-blue);">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
-            const summary = c.request_summary || '';
-            const action = c.actions_taken || '';
-            let reasonHtml = '';
-            if (summary) {
-                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--accent-red);"><span style="font-weight: 600;">בקשה:</span> ${summary}</div>`;
-            } else {
-                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 6px; color: var(--accent-red);">(הועבר למוקד)</div>`;
-            }
-            if (action) {
-                reasonHtml += `<div style="font-weight: normal; font-size: 0.9em; margin-top: 4px; color: var(--accent-blue);"><span style="font-weight: 600;">פעולה:</span> ${action}</div>`;
-            }
+            const parkingNameStr = (currentParkingId === 'all') ? `<span style="font-size:0.85rem; color:#00d2ff;">התקשר מ${getParkingNameById(c.parking_id)}</span>` : '';
+            const req = c.request_summary || '-';
+            const act = c.actions_taken || '-';
+            const reasonHtml = ` <div style="font-weight: normal; font-size: 0.99em; margin-top: 5px;"><strong style="color: orange;">בקשה:</strong> <span style="color: orange;">${req}</span><br><strong style="color: gray;">פעולה:</strong> <span style="color: gray;">${act}</span></div>`;
             
             opList.innerHTML += `
                 <li class="call-item ${hlClass} ${animClass}">
@@ -1111,13 +1213,8 @@ function updateRecentCalls() {
                     </div>
                 </li>
             `;
-            c.isNew = false;
         });
     }
-    
-    // Clear the isNew flag globally so that calls don't highlight retroactively 
-    // if the user switches to a different parking filter later.
-    allCalls.forEach(c => { c.isNew = false; });
 }
 
 // ----------------------------------------------------
@@ -1125,15 +1222,19 @@ function updateRecentCalls() {
 // ----------------------------------------------------
 const toggleAllCallsBtn = document.getElementById('toggle-all-calls');
 const allCallsContainer = document.getElementById('all-calls-container');
+const tableWrapper = allCallsContainer ? allCallsContainer.querySelector('.table-wrapper') : null;
 let isTableVisible = false;
 
+// Default hide main table
+if (tableWrapper) tableWrapper.style.display = 'none';
+
 if (toggleAllCallsBtn) {
-    toggleAllCallsBtn?.addEventListener('click', () => {
+    toggleAllCallsBtn.addEventListener('click', () => {
         isTableVisible = !isTableVisible;
         if (isTableVisible) {
-            if (allCallsContainer) allCallsContainer.style.display = 'block';
+            if (tableWrapper) tableWrapper.style.display = 'block';
         } else {
-            if (allCallsContainer) allCallsContainer.style.display = 'none';
+            if (tableWrapper) tableWrapper.style.display = 'none';
         }
     });
 }
@@ -1141,7 +1242,7 @@ if (toggleAllCallsBtn) {
 const toggleAdvBtn = document.getElementById('toggle-adv-search');
 const advContainer = document.getElementById('adv-search-container');
 if (toggleAdvBtn && advContainer) {
-    toggleAdvBtn?.addEventListener('click', () => {
+    toggleAdvBtn.addEventListener('click', () => {
         if (advContainer.style.display === 'none') {
             advContainer.style.display = 'block';
             toggleAdvBtn.style.background = 'var(--accent-blue)';
@@ -1155,26 +1256,28 @@ if (toggleAdvBtn && advContainer) {
 }
 
 const searchInputs = [
-    document.getElementById('global-search'),
+    document.getElementById('search-date'),
+    document.getElementById('search-start-date'),
+    document.getElementById('search-end-date'),
     document.getElementById('search-time'),
-    document.getElementById('search-parking'),
-    document.getElementById('search-lane'),
     document.getElementById('search-plate'),
-    document.getElementById('search-driver'),
-    document.getElementById('search-duration'),
     document.getElementById('search-reason'),
-    document.getElementById('search-action'),
+    document.getElementById('search-action-db'),
     document.getElementById('search-handled-by')
 ];
 
 function triggerSearch() {
+    if (!isTableVisible && tableWrapper) {
+        isTableVisible = true;
+        tableWrapper.style.display = 'block';
+    }
     updateTable();
 }
 
 searchInputs.forEach(input => {
     if(input) {
-        input?.addEventListener('input', triggerSearch);
-        input?.addEventListener('change', triggerSearch);
+        input.addEventListener('input', triggerSearch);
+        input.addEventListener('change', triggerSearch);
     }
 });
 
@@ -1184,26 +1287,21 @@ function updateTable() {
     
     let callsToShow = filteredCalls;
     
-    // For the operator dashboard, only show calls that were forwarded to the operator in the table
-    if (window.location.pathname.includes('operator_dashboard')) {
-        callsToShow = callsToShow.filter(c => c.is_forwarded === 'true' || c.is_forwarded === true);
-    }
-    
     const qGlobal = document.getElementById('global-search') ? document.getElementById('global-search').value.trim().toLowerCase() : '';
     const qExactDate = document.getElementById('search-date') ? document.getElementById('search-date').value : '';
-    const dateMode = document.getElementById('search-date-mode') ? document.getElementById('search-date-mode').value : 'exact';
+    const qStartDate = document.getElementById('search-start-date') ? document.getElementById('search-start-date').value : '';
     const qEndDate = document.getElementById('search-end-date') ? document.getElementById('search-end-date').value : '';
-    const qTime = document.getElementById('search-time').value.trim().toLowerCase();
-    const qParking = document.getElementById('search-parking').value.trim().toLowerCase();
-    const qLane = document.getElementById('search-lane').value.trim().toLowerCase();
-    const qPlate = document.getElementById('search-plate').value.trim().toLowerCase();
-    const qDriver = document.getElementById('search-driver').value.trim().toLowerCase();
-    const qDuration = document.getElementById('search-duration').value.trim().toLowerCase();
-    const qReason = document.getElementById('search-reason').value.trim().toLowerCase();
-    const qAction = document.getElementById('search-action') ? document.getElementById('search-action').value.trim().toLowerCase() : '';
-    const qHandledBy = document.getElementById('search-handled-by').value;
+    const qTime = document.getElementById('search-time') ? document.getElementById('search-time').value.trim().toLowerCase() : '';
+    const qParking = document.getElementById('search-parking') ? document.getElementById('search-parking').value.trim().toLowerCase() : '';
+    const qLane = document.getElementById('search-lane') ? document.getElementById('search-lane').value.trim().toLowerCase() : '';
+    const qPlate = document.getElementById('search-plate') ? document.getElementById('search-plate').value.trim().toLowerCase() : '';
+    const qDriver = document.getElementById('search-driver') ? document.getElementById('search-driver').value.trim().toLowerCase() : '';
+    const qDuration = document.getElementById('search-duration') ? document.getElementById('search-duration').value.trim().toLowerCase() : '';
+    const qReason = document.getElementById('search-reason') ? document.getElementById('search-reason').value.trim().toLowerCase() : '';
+    const qActionDb = document.getElementById('search-action-db') ? document.getElementById('search-action-db').value.trim().toLowerCase() : '';
+    const qHandledBy = document.getElementById('search-handled-by') ? document.getElementById('search-handled-by').value : '';
     
-    const isSearching = qGlobal || qExactDate || qEndDate || qTime || qParking || qLane || qPlate || qDriver || qDuration || qReason || qAction || qHandledBy;
+    const isSearching = qGlobal || qExactDate || qStartDate || qEndDate || qTime || qParking || qLane || qPlate || qDriver || qDuration || qReason || qActionDb || qHandledBy;
     
     if (isSearching) {
         callsToShow = callsToShow.filter(c => {
@@ -1229,43 +1327,59 @@ function updateTable() {
             const timeStr1 = `${HH}:${MM}:${SS}`;
             const timeStr2 = `${HH}:${MM}`;
             
-            if (qExactDate) {
-                // Parse DD/MM/YYYY
-                const parseDate = (str) => {
-                    const parts = str.split('/');
-                    if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                    return null;
-                };
-                
-                const dateOnly = new Date(dateObj);
-                dateOnly.setHours(0,0,0,0);
-                
-                const startD = parseDate(qExactDate);
-                if (!startD) return true; // Invalid format yet
-                startD.setHours(0,0,0,0);
-
-                if (dateMode === 'range' && qEndDate) {
-                    const endD = parseDate(qEndDate);
-                    if (endD) {
-                        endD.setHours(23,59,59,999);
-                        if (dateObj < startD || dateObj > endD) return false;
-                    } else {
-                        // only start date valid
-                        if (dateObj < startD) return false;
-                    }
-                } else {
-                    if (dateOnly.getTime() !== startD.getTime()) return false;
+            function parseDDMMYYYY(dateStr) {
+                if (!dateStr || dateStr.length < 8) return null;
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                    const d = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1], 10) - 1;
+                    const y = parseInt(parts[2], 10);
+                    // Handle 2-digit years optionally, but expect 4
+                    return new Date(y, m, d);
                 }
+                return null;
+            }
+
+            const skipDateFilters = !!(qReason || qActionDb);
+
+            if (!skipDateFilters) {
+                if (qExactDate || qStartDate || qEndDate) {
+                    const dateOnly = new Date(dateObj);
+                    dateOnly.setHours(0,0,0,0);
+                    
+                    if (qExactDate) {
+                        const exactD = parseDDMMYYYY(qExactDate);
+                        if (!exactD) return false;
+                        exactD.setHours(0,0,0,0);
+                        if (dateOnly.getTime() !== exactD.getTime()) return false;
+                    } else {
+                        if (qStartDate) {
+                            const startD = parseDDMMYYYY(qStartDate);
+                            if (startD) {
+                                startD.setHours(0,0,0,0);
+                                if (dateOnly < startD) return false;
+                            }
+                        }
+                        if (qEndDate) {
+                            const endD = parseDDMMYYYY(qEndDate);
+                            if (endD) {
+                                endD.setHours(23,59,59,999);
+                                if (dateObj > endD) return false;
+                            }
+                        }
+                    }
+                }
+                
+                if (qTime && !timeStr1.includes(qTime) && !timeStr2.includes(qTime)) return false;
             }
             
-            if (qTime && !timeStr1.includes(qTime) && !timeStr2.includes(qTime)) return false;
             if (qParking && (!c.parking_id || !String(c.parking_id).includes(qParking))) return false;
             if (qLane && (!c.lane_id || !String(c.lane_id).includes(qLane))) return false;
             if (qPlate && (!c.plate_number || !String(c.plate_number).includes(qPlate))) return false;
             if (qDriver && (!c.driver_name || !c.driver_name.toLowerCase().includes(qDriver))) return false;
             if (qDuration && (!c.call_duration || !String(c.call_duration).includes(qDuration))) return false;
             if (qReason && (!c.request_summary || !c.request_summary.toLowerCase().includes(qReason))) return false;
-            if (qAction && (!c.actions_taken || !c.actions_taken.toLowerCase().includes(qAction))) return false;
+            if (qActionDb && (!c.actions_taken || !c.actions_taken.toLowerCase().includes(qActionDb))) return false;
             
             if (qHandledBy) {
                 const isForwarded = String(c.is_forwarded).toLowerCase() === 'true';
@@ -1295,6 +1409,7 @@ function renderTableRows() {
         const status = c.is_forwarded === 'true' ? t('transferred_to_op') : t('handled_by_ai');
         
         const tr = document.createElement('tr');
+        if (c.isNew) tr.classList.add('new-row-flash');
         tr.innerHTML = `
             <td>${dateStr}</td>
             <td>${getParkingNameById(c.parking_id)}</td>
@@ -1369,7 +1484,6 @@ function renderTableRows() {
 // Graph
 // ----------------------------------------------------
 document.getElementById('graph-timeframe')?.addEventListener('change', (e) => {
-    localStorage.setItem('intercom_pref_graph_timeframe', e.target.value);
     const customContainer = document.getElementById('custom-graph-date-range');
     if (customContainer) {
         if (e.target.value === 'custom') {
@@ -1443,7 +1557,12 @@ function renderPopularTimes() {
         <div class="pt-guide-line" style="bottom: 75%;"></div>
     `;
 
-    smoothedCalls.forEach((count, hour) => {
+    const displayOrder = [];
+    for (let i = 1; i <= 23; i++) displayOrder.push(i);
+    displayOrder.push(0);
+
+    displayOrder.forEach(hour => {
+        const count = smoothedCalls[hour];
         const heightPct = (count / maxCalls) * 100;
         const col = document.createElement('div');
         col.className = 'pt-bar-col';
@@ -1505,19 +1624,22 @@ function updateGraph() {
     let orderedLabels = [];
     
     if (timeframe === '24h') {
-        for (let i = 23; i >= 0; i--) {
-            const d = new Date(latestDate.getTime() - i * 60 * 60 * 1000);
-            const label = `${d.getHours()}:00`;
+        for (let i = 1; i <= 23; i++) {
+            const label = `${i}:00`;
             buckets[label] = {ai: 0, op: 0};
             orderedLabels.push(label);
         }
+        buckets['0:00'] = {ai: 0, op: 0};
+        orderedLabels.push('0:00');
         
         filteredCalls.forEach(c => {
             const d = new Date(c.created_at);
-            if (latestDate - d <= 24 * 60 * 60 * 1000) {
+            if (d.getDate() === latestDate.getDate() && 
+                d.getMonth() === latestDate.getMonth() && 
+                d.getFullYear() === latestDate.getFullYear()) {
                 const label = `${d.getHours()}:00`;
                 if (buckets[label]) {
-                    if (c.is_forwarded === 'true') buckets[label].op++;
+                    if (String(c.is_forwarded).toLowerCase() === 'true') buckets[label].op++;
                     else buckets[label].ai++;
                 }
             }
@@ -1542,7 +1664,7 @@ function updateGraph() {
             }
         });
     } else if (['monthly', 'all'].includes(timeframe)) {
-        const monthsCount = timeframe === 'monthly' ? 12 : 9999;
+        const monthsCount = timeframe === 'monthly' ? 24 : 9999;
         
         if (timeframe !== 'all') {
             for (let i = monthsCount - 1; i >= 0; i--) {
@@ -1725,14 +1847,12 @@ const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 tabButtons.forEach(btn => {
-    btn?.addEventListener('click', () => {
-        const targetId = btn.getAttribute('data-target');
-        if (!targetId) return; // Skip if it's an admin dashboard tab
-        
+    btn.addEventListener('click', () => {
         tabButtons.forEach(b => b.classList.remove('active'));
         tabContents.forEach(c => c.style.display = 'none');
         
         btn.classList.add('active');
+        const targetId = btn.getAttribute('data-target');
         const targetContent = document.getElementById(targetId);
         if (targetContent) {
             targetContent.style.display = targetId === 'tab-recent-ai' ? 'block' : 'flex';
@@ -1812,7 +1932,8 @@ function renderActionList(type, data) {
         rightDiv.style.flex = '1';
         rightDiv.style.textAlign = 'right';
         const driverNameStr = item.driver_name ? ` - ${item.driver_name}` : '';
-        rightDiv.innerHTML = `<strong>${item.plate}</strong><span style="font-weight: normal; opacity: 0.9;">${driverNameStr}</span>`;
+        const parkingName = getParkingNameById(item.parking_id) || 'כללי';
+        rightDiv.innerHTML = `<strong>${item.plate}</strong><span style="font-weight: normal; opacity: 0.9;">${driverNameStr}</span><div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 3px;">${parkingName}</div>`;
         
         // Middle side: Reason
         const middleDiv = document.createElement('div');
@@ -1872,7 +1993,7 @@ function renderOwnerActionList(type, data) {
         const dateObj = new Date(item.added_at);
         const dateStr = dateObj.toLocaleDateString('he-IL') + ' ' + dateObj.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
         
-        let detailsStr = `<strong>${item.plate}</strong> | חניון: ${parkingName}`;
+        let detailsStr = `<strong>${item.plate}</strong> | ${parkingName}`;
         if (item.driver_name) detailsStr += ` | נהג: ${item.driver_name}`;
         
         let notesStr = item.reason || item.action || '';
@@ -1913,7 +2034,7 @@ function setupOwnerListForms() {
     ['blocked', 'authorized'].forEach(type => {
         const form = document.getElementById(`owner-add-${type}-form`);
         if (form) {
-            form?.addEventListener('submit', async (e) => {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const payload = Object.fromEntries(formData.entries());
@@ -1949,9 +2070,9 @@ function setupOwnerListForms() {
 
 function calculateAICosts(calls) {
     const displayEl = document.getElementById('ai-cost-display');
-    const timeframeSelect = document.getElementById('stats-timeframe');
+    const timeframeSelect = document.getElementById('ai-cost-timeframe') || { value: '30d' };
     
-    if (!displayEl || !timeframeSelect) return;
+    if (!displayEl) return;
     if (!calls || calls.length === 0) {
         displayEl.innerText = '0.00 ₪';
         return;
@@ -1983,11 +2104,10 @@ function calculateAICosts(calls) {
     else if (timeframe === 'custom') {
         const startVal = document.getElementById('custom-start-date')?.value;
         const endVal = document.getElementById('custom-end-date')?.value;
-        if (startVal && endVal && startVal.length === 10 && endVal.length === 10) {
-            const [sd, sm, sy] = startVal.split('/');
-            const [ed, em, ey] = endVal.split('/');
-            startWin = new Date(`${sy}-${sm}-${sd}T00:00:00`);
-            endWin = new Date(`${ey}-${em}-${ed}T23:59:59`);
+        if (startVal && endVal) {
+            startWin = new Date(startVal);
+            startWin.setHours(0, 0, 0, 0);
+            endWin = new Date(endVal);
             endWin.setHours(23, 59, 59, 999);
         }
     }
@@ -1999,6 +2119,30 @@ function calculateAICosts(calls) {
     
     // Data for graph: day string (YYYY-MM-DD) -> { freeMins: 0, paidCalls: 0 }
     const graphData = {};
+    const isHourly = (timeframe === 'today' || timeframe === '24h');
+    
+    // Pre-fill graphData with empty slots to ensure they show up in the graph
+    if (isHourly) {
+        for (let h = 0; h < 24; h++) {
+            const hKey = String(h).padStart(2, '0') + ':00';
+            graphData[hKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+        }
+    } else if (timeframe !== 'all' && startWin.getTime() > 0) {
+        let currentDay = new Date(startWin);
+        // Don't pre-fill dates beyond today
+        const limitDay = new Date(Math.min(endWin.getTime(), new Date().getTime())); 
+        limitDay.setHours(23, 59, 59, 999);
+        
+        let loopCount = 0;
+        // Limit to max 365 days to prevent browser freezing just in case
+        while (currentDay <= limitDay && loopCount < 366) {
+            const dayKey = currentDay.getFullYear() + '-' + String(currentDay.getMonth() + 1).padStart(2, '0') + '-' + String(currentDay.getDate()).padStart(2, '0');
+            graphData[dayKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+            currentDay.setDate(currentDay.getDate() + 1);
+            loopCount++;
+        }
+    }
+
     const rateStr = sessionStorage.getItem('intercom_rate_per_minute');
     const ratePerMinute = rateStr ? parseFloat(rateStr) : 2.20;
     const ratePerSec = ratePerMinute / 60.0;
@@ -2061,9 +2205,15 @@ function calculateAICosts(calls) {
                 currentQuotaCount: currentQuotaCount
             });
             
-            if (!graphData[dayKey]) graphData[dayKey] = { freeCalls: 0, paidCalls: 0 };
-            graphData[dayKey].freeCalls += consumedFreeCalls;
-            if (isPaidCall) graphData[dayKey].paidCalls += 1;
+            let plotKey = dayKey;
+            if (isHourly) {
+                plotKey = String(d.getHours()).padStart(2, '0') + ':00';
+            }
+            
+            if (!graphData[plotKey]) graphData[plotKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+            graphData[plotKey].freeCalls += consumedFreeCalls;
+            if (isPaidCall) graphData[plotKey].paidCalls += 1;
+            graphData[plotKey].cost += callCost;
         }
     });
     
@@ -2112,6 +2262,8 @@ function renderAICostList(callsList) {
         return;
     }
     
+    let htmlContent = '';
+    
     callsList.forEach(item => {
         const c = item.call;
         const d = new Date(c.created_at);
@@ -2128,17 +2280,21 @@ function renderAICostList(callsList) {
         }
         
         const plate = c.plate_number || 'לא ידוע';
+        const flashClass = c.isNew ? 'new-row-flash' : '';
         
-        listEl.innerHTML += `
-            <li style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 1px solid var(--border-color);">
+        htmlContent += `
+            <li class="${flashClass}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 1px solid var(--border-color);">
                 <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
                     <span style="font-weight: bold; font-size: 1rem;">רכב: ${plate}</span>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">${timeStr} | ${dateStr}</span>
+                    <span style="font-size: 0.8rem; color: #ffffff !important;">${timeStr} | ${dateStr}</span>
+                    <span style="font-size: 0.76rem; margin-top: 4px;"><strong style="color: orange;">בקשה:</strong> <span style="color: gray;">${c.request_summary || '-'}</span> | <strong style="color: gray;">פעולה:</strong> <span style="color: gray;">${c.actions_taken || '-'}</span></span>
                 </div>
                 <div style="flex-shrink: 0; margin-right: 15px;">${statusHtml}</div>
             </li>
         `;
     });
+    
+    listEl.innerHTML = htmlContent;
 }
 
 function renderAICostGraph(graphData) {
@@ -2157,58 +2313,6 @@ function renderAICostGraph(graphData) {
     const maxPaid = Math.max(...days.map(d => graphData[d].paidCalls), 5);
     
     const chartWrapper = document.createElement('div');
-    const isMobileOperator = document.body.classList.contains('operator-page') && window.innerWidth <= 768;
-    
-    if (isMobileOperator) {
-        chartWrapper.style.display = 'block';
-        chartWrapper.style.height = '100%';
-        chartWrapper.style.width = '100%';
-        chartWrapper.style.padding = '10px 0';
-        
-        const svgNS = "http://www.w3.org/2000/svg";
-        const svg = document.createElementNS(svgNS, 'svg');
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', '100%');
-        svg.setAttribute('viewBox', '0 0 100 100');
-        svg.setAttribute('preserveAspectRatio', 'none');
-        svg.style.overflow = 'visible';
-        
-        let freePoints = [];
-        let paidPoints = [];
-        const step = days.length > 1 ? (100 / (days.length - 1)) : 0;
-        
-        days.forEach((day, i) => {
-            const data = graphData[day];
-            const x = days.length > 1 ? (i * step) : 50;
-            // Leave 10% padding at top so lines don't hit the very ceiling
-            const freeY = 100 - ((data.freeCalls / (maxFree || 1)) * 90);
-            const paidY = 100 - ((data.paidCalls / (maxPaid || 1)) * 90);
-            
-            freePoints.push(`${x},${freeY}`);
-            paidPoints.push(`${x},${paidY}`);
-        });
-        
-        const freePoly = document.createElementNS(svgNS, 'polyline');
-        freePoly.setAttribute('points', freePoints.join(' '));
-        freePoly.setAttribute('fill', 'none');
-        freePoly.setAttribute('stroke', 'var(--accent-blue)');
-        freePoly.setAttribute('stroke-width', '3');
-        freePoly.setAttribute('vector-effect', 'non-scaling-stroke');
-        
-        const paidPoly = document.createElementNS(svgNS, 'polyline');
-        paidPoly.setAttribute('points', paidPoints.join(' '));
-        paidPoly.setAttribute('fill', 'none');
-        paidPoly.setAttribute('stroke', 'var(--accent-green)');
-        paidPoly.setAttribute('stroke-width', '3');
-        paidPoly.setAttribute('vector-effect', 'non-scaling-stroke');
-        
-        svg.appendChild(freePoly);
-        svg.appendChild(paidPoly);
-        chartWrapper.appendChild(svg);
-        container.appendChild(chartWrapper);
-        return;
-    }
-    
     chartWrapper.style.display = 'flex';
     chartWrapper.style.height = '100%';
     chartWrapper.style.alignItems = 'flex-end';
@@ -2258,10 +2362,20 @@ function renderAICostGraph(graphData) {
         if (data.paidCalls === 0) paidBar.style.display = 'none';
         else paidBar.style.height = `${Math.max(paidH, 2)}%`;
         
-        const [y, m, d] = day.split('-');
+        let labelDisplay = '';
+        let titleDisplay = '';
+        if (day.includes(':')) {
+            labelDisplay = day;
+            titleDisplay = `שעה ${day}`;
+        } else {
+            const [y, m, d_part] = day.split('-');
+            labelDisplay = `${d_part}/${m}`;
+            titleDisplay = labelDisplay;
+        }
         
+        const costStr = data.cost > 0 ? `<br/>עלות: ${data.cost.toFixed(2)} ₪` : '';
         const tooltip = document.createElement('div');
-        tooltip.innerHTML = `<strong>${d}/${m}</strong><br/>במכסה: ${data.freeCalls}<br/>שיחות AI: ${data.paidCalls}`;
+        tooltip.innerHTML = `<strong>${titleDisplay}</strong><br/>במכסה: ${data.freeCalls}<br/>שיחות AI: ${data.paidCalls}${costStr}`;
         tooltip.style.position = 'absolute';
         tooltip.style.top = '5px';
         tooltip.style.left = '50%';
@@ -2282,12 +2396,12 @@ function renderAICostGraph(graphData) {
         tooltip.style.textAlign = 'center';
         tooltip.style.lineHeight = '1.4';
         
-        col?.addEventListener('mouseenter', () => {
+        col.addEventListener('mouseenter', () => {
             tooltip.style.opacity = '1';
             col.style.background = 'rgba(255,255,255,0.03)';
             col.style.borderRadius = '4px 4px 0 0';
         });
-        col?.addEventListener('mouseleave', () => {
+        col.addEventListener('mouseleave', () => {
             tooltip.style.opacity = '0';
             col.style.background = 'transparent';
         });
@@ -2297,7 +2411,7 @@ function renderAICostGraph(graphData) {
         col.appendChild(tooltip);
         
         const label = document.createElement('div');
-        label.innerText = `${d}/${m}`;
+        label.innerText = labelDisplay;
         label.style.fontSize = '0.75rem';
         label.style.color = 'var(--text-muted)';
         label.style.position = 'absolute';
@@ -2323,12 +2437,12 @@ document.getElementById('search-authorized')?.addEventListener('input', () => {
 
 
 // Auto-start dashboard
-if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker') || document.getElementById('operator-dashboard-marker')) {
+if (document.getElementById('owner-dashboard-marker')) {
     initDashboard();
-} else {
-    // We are on index.html
-    if (sessionStorage.getItem('intercom_session_token') && !sessionStorage.getItem('intercom_token')) {
-        showScreen('two-fa-screen');
+} else if (!document.getElementById('admin-dashboard-marker')) {
+    if (sessionStorage.getItem('intercom_session_token')) {
+        showScreen('dashboard-screen');
+        initDashboard();
     }
 }
 
@@ -2340,7 +2454,7 @@ setInterval(() => {
     // Fallback if user didn't log in again
     if (!role) {
         // If they ever visit admin, they are an admin.
-        if (path.includes('admin_dashboard') || path.includes('finance')) {
+        if (path.includes('admin_dashboard')) {
             role = 'admin';
             sessionStorage.setItem('intercom_user_role', 'admin');
         } else if (path.includes('owner_dashboard')) {
@@ -2351,24 +2465,34 @@ setInterval(() => {
     let roleNavContainer = document.getElementById('role-nav-buttons');
     if (roleNavContainer && (role === 'owner' || role === 'manager' || role === 'admin')) {
         roleNavContainer.style.display = 'flex';
-
+        roleNavContainer.style.background = 'rgba(0,0,0,0.2)';
+        roleNavContainer.style.padding = '4px 8px';
+        roleNavContainer.style.borderRadius = '8px';
         roleNavContainer.style.border = '1px solid rgba(255,255,255,0.1)';
         
         const isOwner = path.includes('owner_dashboard');
-        const isAdmin = path.includes('admin_dashboard') || path.includes('finance');
+        const isAdmin = path.includes('admin_dashboard');
         const isOperator = (!isOwner && !isAdmin);
 
         const btnAdmin = document.getElementById('nav-admin-btn');
         const btnManager = document.getElementById('nav-manager-btn');
         const btnOperator = document.getElementById('nav-operator-btn');
 
-        if (role === 'admin') {
-            if (!isAdmin && btnAdmin) { btnAdmin.style.display = 'inline-block'; btnAdmin.style.background = 'var(--accent-blue)'; }
-            if (!isOwner && btnManager) { btnManager.style.display = 'inline-block'; btnManager.style.background = 'var(--accent-blue)'; }
-            if (!isOperator && btnOperator) { btnOperator.style.display = 'inline-block'; btnOperator.style.background = 'var(--accent-blue)'; }
-        } else if (role === 'manager' || role === 'owner') {
-            if (!isOwner && btnManager) { btnManager.style.display = 'inline-block'; btnManager.style.background = 'var(--accent-blue)'; }
-            if (!isOperator && btnOperator) { btnOperator.style.display = 'inline-block'; btnOperator.style.background = 'var(--accent-blue)'; }
+        if (btnAdmin) {
+            if (role === 'admin') {
+                btnAdmin.style.display = 'inline-block';
+            }
+            if (isAdmin) btnAdmin.classList.add('active');
+        }
+        if (btnManager) {
+            if (role === 'admin' || role === 'manager' || role === 'owner') {
+                btnManager.style.display = 'inline-block';
+            }
+            if (isOwner) btnManager.classList.add('active');
+        }
+        if (btnOperator) {
+            btnOperator.style.display = 'inline-block';
+            if (isOperator) btnOperator.classList.add('active');
         }
     }
 }, 1000);
@@ -2434,7 +2558,6 @@ window.printAICost = function() {
     
     const items = listEl.querySelectorAll('li');
     items.forEach(li => {
-        // Simple extraction based on the rendered HTML structure
         const spans = li.querySelectorAll('span');
         if (spans.length >= 3) {
             const plateInfo = spans[0].innerText;
@@ -2455,98 +2578,181 @@ window.printAICost = function() {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 };
 
+// ==========================================
+// Legal & Policies Modal Logic
+// ==========================================
+document.body.addEventListener('click', (e) => {
+    // Open Modal
+    if (e.target && (e.target.id === 'open-legal-modal' || e.target.closest('#open-legal-modal'))) {
+        e.preventDefault();
+        const overlay = document.getElementById('legal-modal-overlay');
+        if (overlay) overlay.style.display = 'flex';
+    }
+    
+    // Close Modal via button
+    if (e.target && (e.target.id === 'legal-close-btn' || e.target.closest('#legal-close-btn'))) {
+        const overlay = document.getElementById('legal-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+    
+    // Close Modal via overlay click
+    if (e.target && e.target.id === 'legal-modal-overlay') {
+        e.target.style.display = 'none';
+    }
 
-// ----------------------------------------------------
-// Init Flatpickr and Advanced Filters
-// ----------------------------------------------------
-
-
-
-// ----------------------------------------------------
-// Input Masks and Date Mode
-// ----------------------------------------------------
-function applyDateMask(el) {
-    if (!el) return;
-    el.addEventListener('input', function(e) {
-        if (e.inputType === 'deleteContentBackward') return;
-        let v = this.value.replace(/\D/g, '');
-        if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
-        if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5, 9);
-        this.value = v;
-        if (v.length === 10 || v.length === 0) triggerSearch();
-    });
-}
-
-function applyTimeMask(el) {
-    if (!el) return;
-    el.addEventListener('input', function(e) {
-        if (e.inputType === 'deleteContentBackward') return;
-        let v = this.value.replace(/\D/g, '');
-        if (v.length > 2) v = v.substring(0,2) + ':' + v.substring(2);
-        if (v.length > 5) v = v.substring(0,5) + ':' + v.substring(5, 7);
-        this.value = v;
-        if (v.length === 8 || v.length === 0) triggerSearch();
-    });
-}
-
-applyDateMask(document.getElementById('search-date'));
-applyDateMask(document.getElementById('search-end-date'));
-applyTimeMask(document.getElementById('search-time'));
-
-const dateModeEl = document.getElementById('search-date-mode');
-const endDateEl = document.getElementById('search-end-date');
-if (dateModeEl && endDateEl) {
-    dateModeEl.addEventListener('change', function() {
-        if (this.value === 'range') {
-            endDateEl.style.display = 'block';
-        } else {
-            endDateEl.style.display = 'none';
-            endDateEl.value = '';
+    // Tab Switching
+    if (e.target && e.target.classList.contains('legal-nav-btn')) {
+        const navBtns = document.querySelectorAll('.legal-nav-btn');
+        const sections = document.querySelectorAll('.legal-section');
+        
+        // Remove active from all btns and sections
+        navBtns.forEach(b => b.classList.remove('active'));
+        sections.forEach(s => s.classList.remove('active'));
+        
+        // Add active to clicked btn
+        e.target.classList.add('active');
+        
+        // Show target section
+        const targetId = e.target.getAttribute('data-target');
+        const targetSection = document.getElementById(targetId);
+        if (targetSection) {
+            targetSection.classList.add('active');
         }
-        triggerSearch();
+    }
+});
+
+// ==========================================
+// Date Range Mode Toggling Logic
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const btnDateToggle = document.getElementById('btn-date-toggle');
+    
+    if (btnDateToggle) {
+        let isRangeMode = false;
+        
+        btnDateToggle.addEventListener('click', () => {
+            isRangeMode = !isRangeMode;
+            
+            if (isRangeMode) {
+                // Switch to Range Mode
+                btnDateToggle.textContent = 'תקופתי';
+                document.querySelectorAll('.date-exact-item').forEach(el => el.style.setProperty('display', 'none', 'important'));
+                document.querySelectorAll('.date-range-item').forEach(el => el.style.setProperty('display', 'block', 'important'));
+                document.getElementById('search-date').value = '';
+            } else {
+                // Switch to Exact Mode
+                btnDateToggle.textContent = 'יומי';
+                document.querySelectorAll('.date-range-item').forEach(el => el.style.setProperty('display', 'none', 'important'));
+                document.querySelectorAll('.date-exact-item').forEach(el => el.style.setProperty('display', 'block', 'important'));
+                document.getElementById('search-start-date').value = '';
+                document.getElementById('search-end-date').value = '';
+            }
+            
+            if (typeof triggerSearch === 'function') triggerSearch();
+        });
+    }
+});
+
+// ==========================================
+// Date Input Mask (Auto-insert slashes)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const dateInputs = ['search-date', 'search-start-date', 'search-end-date'];
+    
+    dateInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', function(e) {
+                // Only allow numbers
+                let val = e.target.value.replace(/[^0-9]/g, '');
+                
+                // Format as DD/MM/YYYY
+                if (val.length >= 5) {
+                    val = val.substring(0, 2) + '/' + val.substring(2, 4) + '/' + val.substring(4, 8);
+                } else if (val.length >= 3) {
+                    val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                }
+                
+                e.target.value = val;
+            });
+            
+            // Prevent deleting the slash from getting stuck
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace') {
+                    const val = e.target.value;
+                    if (val.length === 3 && val.endsWith('/')) {
+                        e.target.value = val.substring(0, 2);
+                        e.preventDefault();
+                    } else if (val.length === 6 && val.endsWith('/')) {
+                        e.target.value = val.substring(0, 5);
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
     });
-}
+});
 
-// ----------------------------------------------------
-// Dynamic Actions Datalist
-// ----------------------------------------------------
-function updateActionsDatalist() {
-    const actionDatalist = document.getElementById('common-actions');
-    const reasonDatalist = document.getElementById('common-reasons');
-    
-    if (actionDatalist) {
-        const actions = [...new Set(allCalls.map(c => c.actions_taken).filter(a => a && a.trim() !== ''))];
-        const actionDefaults = ["שער נפתח", "לא נפתח שער / סירוב", "הוכנס מספר רכב ידנית", "תקלה טכנית דווחה", "שיחה מנותקת"];
-        const allUniqueActions = [...new Set([...actionDefaults, ...actions])].sort();
+// ==========================================
+// Time Input Mask (Auto-insert colons)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const timeInput = document.getElementById('search-time');
+    if (timeInput) {
+        timeInput.addEventListener('input', function(e) {
+            // Only allow numbers
+            let val = e.target.value.replace(/[^0-9]/g, '');
+            
+            // Format as hh:mm:ss
+            if (val.length >= 5) {
+                val = val.substring(0, 2) + ':' + val.substring(2, 4) + ':' + val.substring(4, 6);
+            } else if (val.length >= 3) {
+                val = val.substring(0, 2) + ':' + val.substring(2, 4);
+            }
+            
+            e.target.value = val;
+        });
         
-        actionDatalist.innerHTML = '';
-        allUniqueActions.forEach(act => {
-            const option = document.createElement('option');
-            option.value = act;
-            actionDatalist.appendChild(option);
+        // Prevent deleting the colon from getting stuck
+        timeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace') {
+                const val = e.target.value;
+                if (val.length === 3 && val.endsWith(':')) {
+                    e.target.value = val.substring(0, 2);
+                    e.preventDefault();
+                } else if (val.length === 6 && val.endsWith(':')) {
+                    e.target.value = val.substring(0, 5);
+                    e.preventDefault();
+                }
+            }
         });
     }
-    
-    if (reasonDatalist) {
-        const reasons = [...new Set(allCalls.map(c => c.request_summary).filter(r => r && r.trim() !== ''))];
-        const reasonDefaults = ["מנוי בתוקף שנכנס כראוי", "לא מזוהה במצלמה", "מנוי פג תוקף", "תקלה בחשבון"]; // Just a few defaults, the rest comes from DB
-        const allUniqueReasons = [...new Set([...reasonDefaults, ...reasons])].sort();
-        
-        reasonDatalist.innerHTML = '';
-        allUniqueReasons.forEach(res => {
-            const option = document.createElement('option');
-            option.value = res;
-            reasonDatalist.appendChild(option);
-        });
-    }
-}
+});
 
-// Toggle AI lists on mobile
-const toggleAiLists = document.getElementById('toggle-ai-lists');
-if (toggleAiLists) {
-    toggleAiLists.addEventListener('click', () => {
-        const container = document.getElementById('ai-lists-container');
-        container.classList.toggle('open');
-        toggleAiLists.innerText = container.classList.contains('open') ? 'הסתר' : 'הצג';
+// ==========================================
+// Populate Actions Datalist
+// ==========================================
+function populateActionDbDropdown(calls) {
+    const dataList = document.getElementById('actions-list');
+    if (!dataList) return;
+    
+    // Some hardcoded common defaults
+    let actions = [
+        "פתיחת מחסום",
+        "פתיחת מחסום כניסה",
+        "פתיחת מחסום יציאה",
+        "העברה למוקד אנושי"
+    ];
+    
+    // Add dynamically from database
+    const dbActions = calls.map(c => c.actions_taken).filter(Boolean);
+    actions = [...new Set([...actions, ...dbActions])];
+    
+    dataList.innerHTML = '';
+    
+    actions.forEach(action => {
+        const opt = document.createElement('option');
+        opt.value = action;
+        dataList.appendChild(opt);
     });
 }
