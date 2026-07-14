@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>פאנל ניהול (Admin) - SmarterIntercom</title>
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=226">
+    <!-- External fonts removed for offline support; using system fonts instead -->
+    <script src="supabase.js"></script>
+    <script src="translations.js"></script>
+    <script src="security.js?v=2"></script>
+    <script>
+        // Check permissions
+        const userRole = sessionStorage.getItem('intercom_user_role');
+        if (userRole !== 'admin') {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+</head>
+
+<body class="dark-mode admin-page" id="app-body">
+    <div id="global-loader" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; flex-direction: column;">
+        <img src="logo_nb.png" alt="Loading" style="width: 150px; animation: pulse-logo 1.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">
+        <div style="color: white; margin-top: 25px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">טוען נתונים...</div>
+    </div>
+
+    <div id="owner-dashboard-marker" style="display:none;"></div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboard-screen" class="screen active">
+        <img src="logo_nb.png?v=3" alt="Floating Logo" style="position: fixed; top: 15px; left: 15px; height: 50px; z-index: 9999; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+        <header class="dashboard-header">
+            <div class="header-right">
+                <button id="logout-btn" class="btn-secondary" data-i18n="logout_btn">יציאה</button>
+                <div class="font-controls">
+                    <button id="font-increase" title="הגדל פונט">A+</button>
+                    <button id="font-decrease" title="הקטן פונט">A-</button>
+                    <div class="lang-dropdown-container" style="position: relative; display: inline-block;">
+                        <button id="current-lang-btn" title="שפה / Language" style="min-width: 80px;">🇮🇱 HE ▾</button>
+                        <div id="lang-dropdown-menu" class="hidden" style="position: absolute; top: 100%; right: 0; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width: 80px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); flex-direction: column; margin-top: 5px;">
+                            <button class="lang-btn" data-lang="he" title="עברית" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇮🇱 HE</button>
+                            <button class="lang-btn" data-lang="ar" title="العربية" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇦🇪 AR</button>
+                            <button class="lang-btn" data-lang="en" title="English" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇺🇸 EN</button>
+                            <button class="lang-btn" data-lang="ru" title="Русский" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇷🇺 RU</button>
+                        </div>
+                    </div>
+                    <button id="theme-toggle" title="החלף עיצוב">🌓</button>
+                </div>
+                
+            </div>
+            <div class="header-center" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; align-items: center; white-space: nowrap; pointer-events: none;">
+                <div id="greeting-container" style="text-align: center; font-size: 1.2rem; font-weight: 500; display: flex; flex-direction: column; justify-content: center; pointer-events: auto;"></div>
+            </div>
+            <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
+                                <div class="global-clock" id="global-clock" style="margin: 0;"></div>
+                <div id="role-nav-buttons" style="display: flex; gap: 10px; margin-right: 15px; position: relative; z-index: 99;">
+                    <button id="nav-admin-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/admin_dashboard.html'">אדמין</button>
+                    <button id="nav-manager-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/owner_dashboard.html'">מנהל</button>
+                    <button id="nav-operator-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/index.html'">מוקד</button>
+                </div>
+                <div id="global-date" class="global-date" style="font-size: 1.4rem; font-weight: 600; opacity: 1; color: #ffffff !important;"></div>
+                <svg id="connection-status-icon" title="מצב חיבור" style="width: 22px; height: 22px; fill: #30d158; margin-left: 20px; margin-top: 2px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 21c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm-4.6-5.6c2.5-2.5 6.6-2.5 9.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-3.3-3.3-8.7-3.3-12 0-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0zm-3.5-3.5c4.5-4.5 11.7-4.5 16.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-5.3-5.3-13.8-5.3-19.1 0-.4.4-.4 1 0 1.4.4.3 1 .3 1.5 0zm-3.5-3.5c6.4-6.4 16.8-6.4 23.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-7.2-7.2-18.8-7.2-26 0-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0z"/>
+                </svg>
+            </div>
+
+        <!-- Mobile Dropdown Menu -->
+        <div class="mobile-only mobile-dropdown-container" id="mobile-dropdown-container" >
+            <div class="mobile-dropdown-btn" onclick="toggleMobileDropdown()">
+                <span id="mobile-dropdown-current">מוצרים</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="mobile-dropdown-menu">
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('users', 'table', 'ניהול משתמשים')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title" data-i18n="tab_users">ניהול משתמשים</span>
+                    </div>
+                </a>
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('users', 'form', 'טופס משתמש')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title" data-i18n="users_btn_add">טופס משתמש</span>
+                    </div>
+                </a>
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('events', 'all', 'קליטת אירוע ידני')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title" data-i18n="tab_manual_event">קליטת אירוע ידני</span>
+                    </div>
+                </a>
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('whitelist', 'all', 'רשימת מורשים')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title">רשימת מורשים</span>
+                    </div>
+                </a>
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('blacklist', 'all', 'רשימת חסומים')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title">רשימת חסומים</span>
+                    </div>
+                </a>
+                <a class="mobile-dropdown-item" onclick="selectAdminMobile('finance', 'all', 'מערכת כספים')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title" data-i18n="tab_finance">מערכת כספים</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+</header>
+
+
+        
+<main class="dashboard-content">
+            
+    <style>
+        /* Admin specific styles */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .admin-tab-btn { padding: 12px 24px; background: var(--bg-panel); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .admin-tab-btn:hover { background: var(--bg-card); }
+        .admin-tab-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .admin-tab-content { display: none; background: var(--bg-panel); padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); color: var(--text-color); }
+        .admin-tab-content.active { display: block; }
+        .layout { display: grid; grid-template-columns: 1fr 320px; gap: 25px; }
+        
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; color: var(--text-color); }
+        .admin-table th, .admin-table td { padding: 12px; border: 1px solid var(--border-color); text-align: center; }
+        .admin-table th { background-color: var(--bg-card); }
+        .admin-table tr:hover { background-color: var(--bg-body); cursor: pointer; }
+        .admin-table tr.selected-row { background-color: rgba(var(--accent-blue-rgb), 0.1) !important; border: 2px solid var(--accent-blue); }
+        
+        .form-box { background: var(--bg-card); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; background: var(--bg-panel); color: var(--text-color); }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; margin-top: 8px; transition: 0.2s; }
+        .btn-green { background-color: #28a745; }
+        .btn-green:hover { background-color: #218838; }
+        .btn-blue { background-color: #007bff; }
+        .btn-blue:hover { background-color: #0069d9; }
+        .btn-red { background-color: #dc3545; }
+        .btn-red:hover { background-color: #c82333; }
+        .btn-refresh { width: auto; padding: 8px 16px; background: #6c757d; margin: 0; }
+        .btn-refresh:hover { background: #5a6268; }
+        
+        .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .toggle-switch { display: flex; align-items: center; gap: 10px; margin: 15px 0; }
+        .toggle-switch input { width: auto; }
+        
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
+        }
+        body.admin-page { padding-bottom: 100px !important; }
+    </style>
+
+    <!-- Supabase JS -->
+
+
+    <div id="admin-dashboard-marker" style="display:none;"></div>
+
+    <h2 style="margin-bottom: 20px; color: var(--text-color);">ניהול מערכת מרכזי</h2>
+    
+    <div id="parking-selector-container" style="margin-bottom: 20px;">
+        <select id="parking-selector" class="adv-search-input" style="width: auto; cursor: pointer; padding: 5px 10px; font-weight: bold;">
+            <option value="all" data-i18n="all_parkings">כל החניונים</option>
+        </select>
+    </div>
+    
+    <div class="tabs">
+        <button class="admin-tab-btn active" onclick="switchTab('users', this)" data-i18n="tab_users">ניהול משתמשים</button>
+        <button class="admin-tab-btn" onclick="switchTab('events', this)" data-i18n="tab_manual_event">קליטת אירוע ידני</button>
+        <button class="admin-tab-btn" onclick="switchTab('whitelist', this)">רשימת מורשים</button>
+        <button class="admin-tab-btn" onclick="switchTab('blacklist', this)">רשימת חסומים</button>
+        <button class="admin-tab-btn" onclick="switchTab('finance', this)" data-i18n="tab_finance">מערכת כספים</button>
+    </div>
+
+    <div id="users" class="admin-tab-content active">
+        <div class="layout">
+            <div id="users-table-container">
+                <div class="flex-header">
+                    <h3>רשימת משתמשים קיימים בענן</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-refresh" onclick="exportTableToCSV('usersTable', 'users.csv')">CSV</button>
+                        <button class="btn btn-refresh" onclick="printTable('usersTable')">הדפס</button>
+                        <button class="btn btn-refresh" onclick="loadUsers()">רענן</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <style>
+                        .sortable-th { cursor: pointer; user-select: none; }
+                        .sortable-th:hover { background-color: var(--bg-body) !important; }
+                        body.admin-page { padding-bottom: 100px !important; }
+    </style>
+                    <table id="usersTable" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable-th" onclick="sortUsersTable('user_id')">ID <span id="sort-icon-user_id">▲</span></th>
+                                <th class="sortable-th" onclick="sortUsersTable('username')">שם משתמש <span id="sort-icon-username"></span></th>
+                                <th class="sortable-th" onclick="sortUsersTable('user_type')">תפקיד <span id="sort-icon-user_type"></span></th>
+                                <th class="sortable-th" onclick="sortUsersTable('parking_name')">שם חניון <span id="sort-icon-parking_name"></span></th>
+                                <th class="sortable-th" onclick="sortUsersTable('group_name')">קבוצה <span id="sort-icon-group_name"></span></th>
+                                <th class="sortable-th" onclick="sortUsersTable('account_status')">סטטוס <span id="sort-icon-account_status"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="form-box" id="users-form-container">
+                <h4 style="text-align: center; margin-top: 0; margin-bottom: 20px; font-size: 1.2rem; color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;" data-i18n="users_btn_add">טופס משתמש</h4>
+                <div class="form-group"><label>User ID:</label><input type="text" id="u_id"></div>
+                <div class="form-group"><label>שם משתמש:</label><input type="text" id="u_username"></div>
+                <div class="form-group">
+                    <label>תפקיד:</label>
+                    <select id="u_type" class="adv-search-input" style="width: 100%;">
+                        <option value="admin">admin</option>
+                        <option value="manager">manager</option>
+                        <option value="operator">operator</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>שם החניון:</label>
+                    <input type="text" id="u_pname" list="parking-name-list-data" placeholder="בחר שם חניון או הקלד חדש...">
+                    <datalist id="parking-name-list-data"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>קבוצה:</label>
+                    <input type="text" id="u_gname" list="group-list-data" placeholder="בחר קבוצה או הקלד חדש...">
+                    <datalist id="group-list-data"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>מספר חניון:</label>
+                    <input type="text" id="u_pid" list="parking-list-data" placeholder="בחר חניון או הקלד חדש...">
+                    <datalist id="parking-list-data"></datalist>
+                </div>
+                <div class="form-group"><label>טלפון נייד:</label><input type="text" id="u_phone"></div>
+                <div class="form-group"><label>כתובת אימייל:</label><input type="email" id="u_email"></div>
+                <div class="form-group"><label>סיסמה:</label><input type="password" id="u_password" autocomplete="new-password" pattern="^[a-zA-Z0-9@_\-.]+$" title="ניתן להשתמש באותיות, מספרים, וסימנים: @ _ - ."></div>
+                <div class="form-group"><label>מזהה קבוצה:</label><input type="number" id="u_gid" value="0"></div>
+                
+                <div class="form-group" id="u_rate_container" style="display: none;"><label>מחיר לדקה:</label><input type="number" step="0.01" id="u_rate" value="2.20"></div>
+                <div class="toggle-switch"><input type="checkbox" id="u_status" checked><label>חשבון משתמש פעיל</label></div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button class="btn btn-green" style="flex: 1;" onclick="saveUser(false)">צור חדש</button>
+                    <button class="btn btn-blue" style="flex: 1;" onclick="saveUser(true)">עדכן פרטים</button>
+                </div>
+                <button class="btn" style="background: var(--accent-red); width: 100%; color: white;" onclick="deleteUser()" data-i18n="btn_delete_user">מחק משתמש</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="events" class="admin-tab-content">
+        <div class="form-box" style="max-width: 500px; margin: 0 auto;">
+            <h4 style="text-align: center; margin-bottom: 20px;" data-i18n="tab_manual_event">קליטת אירוע ידני</h4>
+            <div class="form-group"><label>מספר חניון:</label><input type="text" id="ev_pid"></div>
+            <div class="form-group"><label>מזהה נתיב:</label><input type="text" id="ev_lane"></div>
+            <div class="form-group"><label>מספר רכב:</label><input type="text" id="ev_plate"></div>
+            <div class="form-group"><label>משך בשניות:</label><input type="number" id="ev_duration" value="0"></div>
+            <div class="form-group"><label>תקציר בקשה:</label><input type="text" id="ev_summary"></div>
+            <div class="form-group"><label>פעולות:</label><input type="text" id="ev_actions"></div>
+            <div class="form-group"><label>שם נהג:</label><input type="text" id="ev_dname"></div>
+            <div class="form-group"><label>טלפון:</label><input type="text" id="ev_dphone"></div>
+            <div class="toggle-switch"><input type="checkbox" id="ev_fwd"><label>הועבר למוקד?</label></div>
+            <div class="toggle-switch"><input type="checkbox" id="ev_corr"><label>תיקון לוחית?</label></div>
+            <button class="btn btn-green" onclick="insertEvent()" style="margin-top: 15px;">שידור אירוע ידני</button>
+        </div>
+    </div>
+
+        <div id="whitelist" class="admin-tab-content">
+        <div style="max-width: 600px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--accent-green); display: flex; flex-direction: column;">
+            <h3 style="color: var(--accent-green); margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; text-align: center;" data-i18n="list_whitelist">רשימת מורשים (Whitelist)</h3>
+            
+            <!-- Add Form -->
+            <form id="owner-add-authorized-form" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; background: rgba(48, 209, 88, 0.05); padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0; font-size: 0.95rem;" data-i18n="add_to_whitelist_title">הוספת רכב למורשים:</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <select name="parking_id" required class="adv-search-input owner-parking-select" style="width: 100%;">
+                        <option value="" data-i18n="select_parking_req">בחר חניון (חובה)</option>
+                        <!-- Options injected by JS -->
+                    </select>
+                    <input type="text" name="plate_number" placeholder="מס רכב (חובה)" data-i18n-placeholder="plate_req" required class="adv-search-input" style="width: 100%;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" name="driver_name" placeholder="שם הנהג (אופציונלי)" data-i18n-placeholder="driver_name_opt" class="adv-search-input" style="width: 100%;">
+                    <input type="text" name="notes" placeholder="הערות (אופציונלי)" data-i18n-placeholder="notes_opt" class="adv-search-input" style="width: 100%;">
+                </div>
+                <button type="submit" class="btn-primary" style="background: var(--accent-green); width: 100%; padding: 10px; font-size: 1rem; margin-top: 10px;" data-i18n="btn_add_whitelist">הוסף למורשים</button>
+            </form>
+            
+            <!-- List -->
+            <div style="flex: 1; overflow-y: auto; max-height: 500px; padding-right: 5px;">
+                <ul id="owner-authorized-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Items injected by JS -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="blacklist" class="admin-tab-content">
+        <div style="max-width: 600px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--accent-red); display: flex; flex-direction: column;">
+            <h3 style="color: var(--accent-red); margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; text-align: center;" data-i18n="list_blacklist">רשימת חסומים (Blacklist)</h3>
+            
+            <!-- Add Form -->
+            <form id="owner-add-blocked-form" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; background: rgba(255, 69, 58, 0.05); padding: 15px; border-radius: 8px;">
+                <h4 style="margin: 0; font-size: 0.95rem;" data-i18n="add_to_blacklist_title">הוספת רכב לחסומים:</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <select name="parking_id" required class="adv-search-input owner-parking-select" style="width: 100%;">
+                        <option value="" data-i18n="select_parking_req">בחר חניון (חובה)</option>
+                        <!-- Options injected by JS -->
+                    </select>
+                    <input type="text" name="plate_number" placeholder="מס רכב (חובה)" data-i18n-placeholder="plate_req" required class="adv-search-input" style="width: 100%;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" name="driver_name" placeholder="שם הנהג (אופציונלי)" data-i18n-placeholder="driver_name_opt" class="adv-search-input" style="width: 100%;">
+                    <input type="text" name="notes" placeholder="הערות (אופציונלי)" data-i18n-placeholder="notes_opt" class="adv-search-input" style="width: 100%;">
+                </div>
+                <button type="submit" class="btn-primary" style="background: var(--accent-red); width: 100%; padding: 10px; font-size: 1rem; margin-top: 10px;" data-i18n="btn_add_blacklist">הוסף לחסומים</button>
+            </form>
+            
+            <!-- List -->
+            <div style="flex: 1; overflow-y: auto; max-height: 500px; padding-right: 5px;">
+                <ul id="owner-blocked-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Items injected by JS -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+<div id="finance" class="admin-tab-content">
+        <div class="layout" style="display: block;">
+            <div class="flex-header">
+                <h3 data-i18n="finance_title">💰 ריכוז כספים ועליות AI</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="finance-month-selector" class="adv-search-input" style="width: 150px;" onchange="loadFinance()">
+                    </select>
+                    <button class="btn btn-refresh" onclick="exportTableToCSV('financeTable', 'finance.csv')">CSV</button>
+                    <button class="btn btn-refresh" onclick="printTable('financeTable')">הדפס</button>
+                    <button class="btn btn-refresh" onclick="loadFinance()">רענן</button>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; margin-top: 15px;">
+                <table id="financeTable" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="finance_col_group">שם קבוצה (Owner)</th>
+                            <th data-i18n="finance_col_ai_total">סה"כ שיחות AI</th>
+                            <th data-i18n="finance_col_quota">במכסה (חינם)</th>
+                            <th data-i18n="finance_col_over">מעבר למכסה (בתשלום)</th>
+                            <th data-i18n="finance_col_rate">תעריף לדקה</th>
+                            <th data-i18n="finance_col_cost">סה"כ עלות (₪)</th>
+                            <th data-i18n="col_actions">פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="financeTableBody">
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Details Modal/Section -->
+            <div id="finance-details-container" style="display: none; margin-top: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                <div class="flex-header">
+                    <h4 id="finance-details-title">פירוט לחניונים: קבוצה X</h4>
+                    <button class="btn-refresh" style="background: transparent; color: var(--accent-red);" onclick="document.getElementById('finance-details-container').style.display='none'">סגור</button>
+                </div>
+                <div style="overflow-x: auto; margin-top: 15px;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>שם חניון</th>
+                                <th data-i18n="finance_col_ai_total">סה"כ שיחות AI</th>
+                                <th data-i18n="finance_col_in_quota">שיחות במכסה</th>
+                                <th data-i18n="finance_col_paid">שיחות בתשלום</th>
+                                <th data-i18n="finance_col_cost_nis">עלות (₪)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="financeDetailsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    
+        // המשתנים מוגדרים כעת כריקים, והם יתמלאו אוטומטית מהשרת המאובטח ב-Render
+        let SUPABASE_URL = ""; 
+        let SUPABASE_KEY = ""; 
+        let supabaseClient = null;
+        let selectedRowId = { whitelist: null, blacklist: null };
+
+        // פונקציית עזר לנקות פורמט טלפונים
+        function cleanPhoneNumber(phone) {
+            if (!phone) return "";
+            let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+            if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
+            if (cleaned.startsWith('9720')) cleaned = '972' + cleaned.substring(4);
+            else if (cleaned.startsWith('0')) cleaned = '972' + cleaned.substring(1);
+            else if (cleaned.startsWith('5')) cleaned = '972' + cleaned;
+            return `+${cleaned}`;
+        }
+
+        function switchTab(tabId, btnElement) {
+            if (!supabaseClient) return; // הגנה: לא מאפשר ללחוץ על טאבים לפני שהמפתחות נטענו
+            
+            document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const targetContent = document.getElementById(tabId);
+            if(targetContent) targetContent.classList.add('active');
+            
+            if (btnElement) {
+                btnElement.classList.add('active');
+            } else {
+                // Fallback if not passed
+                document.querySelectorAll('.admin-tab-btn').forEach(el => {
+                    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(tabId)) {
+                        el.classList.add('active');
+                    }
+                });
+            }
+            
+            if(tabId === 'users') loadUsers();
+            if(tabId === 'events') 
+            if(tabId === 'whitelist' || tabId === 'blacklist') loadLists(tabId);
+            
+            if (tabId === 'finance') {
+                const tbody = document.getElementById('financeTableBody');
+                if (!tbody.innerHTML || tbody.innerHTML.trim() === '') {
+                    loadFinance();
+                }
+            }
+        }
+
+        // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
+        async function initAdminPanel() {
+            try {
+                const LOCAL_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
+                const response = await fetch(`${LOCAL_API_BASE}/api/config`);
+                if (!response.ok) throw new Error("Failed to fetch config from Render");
+                
+                const config = await response.json();
+                SUPABASE_URL = config.SUPABASE_URL;
+                SUPABASE_KEY = config.SUPABASE_KEY;
+                
+                // אתחול הקליינט רק אחרי שהמפתחות הגיעו בהצלחה
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                // טעינה אוטומטית של המשתמשים רק כשהחיבור מוכן
+                loadUsers();
+            } catch (error) {
+                console.error("Configuration error:", error);
+                alert("שגיאה בטעינת תצורת מערכת מאובטחת משרת ה-Render. ודא שהשרת פעיל.");
+            }
+        }
+
+        let usersTableData = [];
+        let currentSortColumn = 'user_id';
+        let sortAscending = true;
+
+        async function loadUsers() {
+            const { data, error } = await supabaseClient.from("users").select("*");
+            if (error) {
+                console.error("Error loading users:", error);
+                return;
+            }
+            usersTableData = data;
+            sortUsersTable(currentSortColumn, true); // initial sort
+        }
+
+        function sortUsersTable(column, forceUpdate = false) {
+            if (!forceUpdate) {
+                if (currentSortColumn === column) {
+                    sortAscending = !sortAscending;
+                } else {
+                    currentSortColumn = column;
+                    sortAscending = true;
+                }
+            }
+
+            usersTableData.sort((a, b) => {
+                let valA = a[column] || '';
+                let valB = b[column] || '';
+                
+                if (column === 'account_status') {
+                    // Normalize statuses for logical sorting (active first usually)
+                    valA = valA === 'active' ? '1' : '0';
+                    valB = valB === 'active' ? '1' : '0';
+                }
+                
+                const comparison = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+                return sortAscending ? comparison : -comparison;
+            });
+
+            // Update sorting icons
+            const headers = ['user_id', 'username', 'user_type', 'parking_name', 'group_name', 'account_status'];
+            headers.forEach(h => {
+                const iconSpan = document.getElementById(`sort-icon-${h}`);
+                if (iconSpan) {
+                    if (h === currentSortColumn) {
+                        iconSpan.innerText = sortAscending ? ' ▲' : ' ▼';
+                    } else {
+                        iconSpan.innerText = '';
+                    }
+                }
+            });
+
+            renderUsersTable();
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById("usersTableBody");
+            tbody.innerHTML = "";
+            
+            const parkingSet = new Set();
+            const parkingNameSet = new Set();
+            const groupSet = new Set();
+
+            usersTableData.forEach(user => {
+                const statusText = user.account_status === "active" ? "🟢 " + t("user_status_active") : "🔴 " + t("user_status_disabled");
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${user.user_id}</td><td>${user.username || ''}</td><td>${user.user_type || ''}</td><td>${user.parking_name || 'לא הוגדר'}</td><td>${user.group_name || ''}</td><td>${statusText}</td>`;
+                
+                if (user.parking_id) parkingSet.add(user.parking_id);
+                if (user.parking_name) parkingNameSet.add(user.parking_name);
+                if (user.group_name) groupSet.add(user.group_name);
+
+                tr.onclick = () => {
+                    document.querySelectorAll("#usersTableBody tr").forEach(r => r.classList.remove("selected-row"));
+                    tr.classList.add("selected-row");
+                    fillUserForm(user);
+                };
+                tbody.appendChild(tr);
+            });
+            
+            const parkingList = document.getElementById("parking-list-data");
+            if (parkingList) {
+                parkingList.innerHTML = Array.from(parkingSet).map(pid => `<option value="${pid}">`).join('');
+            }
+            
+            const parkingNameList = document.getElementById("parking-name-list-data");
+            if (parkingNameList) {
+                parkingNameList.innerHTML = Array.from(parkingNameSet).map(pname => `<option value="${pname}">`).join('');
+            }
+            
+            const groupList = document.getElementById("group-list-data");
+            if (groupList) {
+                groupList.innerHTML = Array.from(groupSet).map(gname => `<option value="${gname}">`).join('');
+            }
+        }
+
+        let currentOriginalUserId = null;
+
+        function fillUserForm(user) {
+            currentOriginalUserId = user.user_id;
+            const uidInput = document.getElementById("u_id");
+            uidInput.value = user.user_id || '';
+            
+            document.getElementById("u_pid").value = user.parking_id || '';
+            document.getElementById("u_pname").value = user.parking_name || '';
+            document.getElementById("u_type").value = user.user_type || 'operator';
+            document.getElementById("u_username").value = user.username || '';
+            document.getElementById("u_email").value = user.email || '';
+            document.getElementById("u_password").value = ""; 
+            document.getElementById("u_phone").value = user.phone_number || '';
+            document.getElementById("u_gname").value = user.group_name || '';
+            document.getElementById("u_gid").value = user.group_id || 0;
+            document.getElementById("u_status").checked = user.account_status === "active";
+            
+            const rateContainer = document.getElementById("u_rate_container");
+            if (user.user_type === 'admin' || user.user_type === 'manager') {
+                rateContainer.style.display = 'block';
+                document.getElementById("u_rate").value = user.rate_per_minute || 2.20;
+            } else {
+                rateContainer.style.display = 'none';
+                document.getElementById("u_rate").value = 2.20;
+            }
+        }
+
+        // Event listener for user type change
+        document.getElementById("u_type").addEventListener('change', (e) => {
+            const type = e.target.value;
+            if (type === 'admin' || type === 'manager') {
+                document.getElementById("u_rate_container").style.display = 'block';
+            } else {
+                document.getElementById("u_rate_container").style.display = 'none';
+            }
+        });
+
+        async function saveUser(isUpdate) {
+            const userId = document.getElementById("u_id").value.trim();
+            if (!userId) return alert("חובה להזין User ID");
+
+            // --- HACK --- 
+            // Since the Render backend might not be deployed yet with the rename feature,
+            // we first rename the user directly in Supabase from the frontend if they changed the ID.
+            if (isUpdate && currentOriginalUserId && currentOriginalUserId !== userId) {
+                await supabaseClient.from('users').update({ user_id: userId }).eq('user_id', currentOriginalUserId);
+            }
+            // ------------
+
+            const safeRegex = /^[a-zA-Z0-9@_\-.]+$/;
+            
+            const usernameVal = document.getElementById("u_username").value.trim();
+
+            const passwordVal = document.getElementById("u_password").value;
+            if (passwordVal && !safeRegex.test(passwordVal)) {
+                return alert("הסיסמה מכילה תווים לא מורשים! מותר רק אותיות, מספרים, וסימנים @ _ - .");
+            }
+
+            const userData = {
+                user_id: userId,
+                parking_id: document.getElementById("u_pid").value.trim(),
+                parking_name: document.getElementById("u_pname").value.trim(),
+                user_type: document.getElementById("u_type").value,
+                username: usernameVal,
+                email: document.getElementById("u_email").value.trim(),
+                phone_number: cleanPhoneNumber(document.getElementById("u_phone").value.trim()),
+                group_name: document.getElementById("u_gname").value.trim(),
+                group_id: parseInt(document.getElementById("u_gid").value || 0),
+                account_status: document.getElementById("u_status").checked ? "active" : "disabled"
+            };
+            
+            if (userData.user_type === 'admin' || userData.user_type === 'manager') {
+                userData.rate_per_minute = parseFloat(document.getElementById("u_rate").value || 2.20);
+            } else {
+                userData.rate_per_minute = 2.20; // Default for operators
+            }
+
+            if (passwordVal) {
+                userData.password_hash = passwordVal;
+            } else if (!isUpdate) {
+                return alert("חובה להזין סיסמה למשתמש חדש");
+            }
+            
+            if (!isUpdate) {
+                currentOriginalUserId = null;
+            }
+            
+            const sessionToken = sessionStorage.getItem('intercom_session_token');
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/admin/user/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_token: sessionToken,
+                        user_data: userData,
+                        is_update: isUpdate,
+                        original_user_id: isUpdate ? currentOriginalUserId : null
+                    })
+                });
+                
+                const json = await res.json();
+                if (json.success) {
+                    alert(isUpdate ? "המשתמש עודכן בהצלחה! 💾" : "משתמש נוצר בהצלחה! ➕");
+                    currentOriginalUserId = userId; // Update memory to new ID
+                    loadUsers();
+                } else {
+                    alert("שגיאה בשמירה: " + (json.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert("שגיאת תקשורת עם השרת: " + err);
+            }
+        }
+
+        async function deleteUser() {
+            const userId = document.getElementById("u_id").value.trim();
+            if (!userId) return alert("אנא בחר משתמש למחיקה");
+            
+            if (!confirm(`האם אתה בטוח שברצונך למחוק את המשתמש ${userId} לחלוטין? פעולה זו אינה הפיכה!`)) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabaseClient.from('users').delete().eq('user_id', userId);
+                if (error) {
+                    alert("שגיאה במחיקה: " + (error.message || 'Unknown error'));
+                } else {
+                    alert("המשתמש נמחק בהצלחה! 🗑️");
+                    document.getElementById("u_id").value = "";
+                    document.getElementById("u_username").value = "";
+                    document.getElementById("u_email").value = "";
+                    document.getElementById("u_phone").value = "";
+                    document.getElementById("u_pname").value = "";
+                    document.getElementById("u_pid").value = "";
+                    document.getElementById("u_gname").value = "";
+                    document.getElementById("u_gid").value = 0;
+                    document.getElementById("u_password").value = "";
+                    loadUsers();
+                }
+            } catch(e) {
+                alert("שגיאת תקשורת: " + e.message);
+            }
+        }
+
+        // טעינת 10 אירועים אחרונים מטבלת calls_log
+        async function loadEvents() {
+            const { data, error } = await supabaseClient.from("calls_log").select("*").order("created_at", { ascending: false }).limit(10);
+            if (error) {
+                console.error("Error loading events:", error);
+                return;
+            }
+            const tbody = document.getElementById("eventsTableBody");
+            tbody.innerHTML = "";
+            data.forEach(ev => {
+                const dateStr = ev.created_at ? ev.created_at.substring(0,16).replace("T", " ") : "";
+                tbody.innerHTML += `<tr><td>${ev.parking_id || ''}</td><td>${dateStr}</td><td>${ev.lane_id || ''}</td><td><strong>${ev.plate_number || ''}</strong></td><td>${ev.call_duration || 0} ש'</td><td>${ev.request_summary || ''}</td><td>${ev.actions_taken || ''}</td><td>${ev.is_forwarded ? 'מוקד 📞':'AI 🤖'}</td><td>${ev.is_plate_corrected ? 'תוקן 🛠️':'תקין ✔️'}</td></tr>`;
+            });
+        }
+
+        async function insertEvent() {
+            let actions = document.getElementById("ev_actions").value.trim();
+            const loggedUser = localStorage.getItem('intercom_remember_user') || '';
+            if (loggedUser) {
+                if (actions) {
+                    actions += ` (בוצע ע"י: ${loggedUser})`;
+                } else {
+                    actions = `(בוצע ע"י: ${loggedUser})`;
+                }
+            }
+            
+            const eventData = {
+                parking_id: document.getElementById("ev_pid").value.trim(),
+                lane_id: document.getElementById("ev_lane").value.trim(),
+                plate_number: document.getElementById("ev_plate").value.trim(),
+                call_duration: parseInt(document.getElementById("ev_duration").value || 0),
+                request_summary: document.getElementById("ev_summary").value.trim(),
+                actions_taken: actions,
+                is_forwarded: document.getElementById("ev_fwd").checked,
+                is_plate_corrected: document.getElementById("ev_corr").checked,
+                driver_name: document.getElementById("ev_dname").value.trim(),
+                driver_phone: document.getElementById("ev_dphone").value.trim()
+            };
+            
+            const { error } = await supabaseClient.from("calls_log").insert(eventData);
+            if (error) alert("שגיאה ברישום אירוע: " + error.message);
+            else {
+                alert("האירוע נרשם בהצלחה בענן! 🔔");
+                
+            }
+        }
+
+        function getSupabaseTableName(tableName) {
+            return tableName;
+        }
+
+        // טעינת רשימות לבנות/שחורות
+        async function loadLists(tableName) {
+            const sbTable = getSupabaseTableName(tableName);
+            const { data, error } = await supabaseClient.from(sbTable).select("*").order("created_at", { ascending: false });
+            if (error) {
+                console.error(`Error loading ${tableName}:`, error);
+                return;
+            }
+            const tbody = document.getElementById(`${tableName}TableBody`);
+            tbody.innerHTML = "";
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${row.id}</td><td>${row.parking_id || ''}</td><td><strong>${row.plate_number}</strong></td><td>${row.driver_name || ''}</td><td>${row.created_at ? row.created_at.substring(0,16) : ''}</td><td>${row.notes || ''}</td>`;
+                
+                tr.onclick = () => {
+                    document.querySelectorAll(`#${tableName}TableBody tr`).forEach(r => r.classList.remove("selected-row"));
+                    tr.classList.add("selected-row");
+                    selectedRowId[tableName] = row.id;
+                };
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function addToList(tableName) {
+            const prefix = tableName === 'whitelist' ? 'w' : 'b';
+            const rowData = {
+                parking_id: document.getElementById(`${prefix}_pid`).value.trim(),
+                plate_number: document.getElementById(`${prefix}_plate`).value.trim(),
+                driver_name: document.getElementById(`${prefix}_dname`).value.trim(),
+                notes: document.getElementById(`${prefix}_notes`).value.trim()
+            };
+            
+            const sbTable = getSupabaseTableName(tableName);
+            const { error } = await supabaseClient.from(sbTable).insert(rowData);
+            if (error) alert("שגיאה בהוספה לרשימה: " + error.message);
+            else {
+                alert("הרכב התווסף בהצלחה לרשימה! 🎉");
+                loadLists(tableName);
+            }
+        }
+
+        async function deleteFromList(tableName) {
+            const id = selectedRowId[tableName];
+            if(!id) return alert("אנא בחר שורה מהטבלה תחילה על ידי לחיצה עליה");
+            
+            if(!confirm("האם אתה בטוח שברצונך למחוק את הרכב הנבחר מהרשימה?")) return;
+            
+            const sbTable = getSupabaseTableName(tableName);
+            const { error } = await supabaseClient.from(sbTable).delete().eq("id", id);
+            if (error) alert("שגיאה במחיקה: " + error.message);
+            else {
+                alert("הרכב הוסר מהרשימה בהצלחה!");
+                selectedRowId[tableName] = null;
+                loadLists(tableName);
+            }
+        }
+
+        // --- Financial System Logic ---
+        let financeData = {}; 
+        let currentFinanceMonth = '';
+        
+        function initFinanceMonthSelector() {
+            const selector = document.getElementById('finance-month-selector');
+            if (!selector) return;
+            selector.innerHTML = '';
+            
+            const now = new Date();
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                const label = d.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.innerText = label;
+                selector.appendChild(opt);
+            }
+            currentFinanceMonth = selector.value;
+        }
+
+        async function loadFinance() {
+            const selector = document.getElementById('finance-month-selector');
+            currentFinanceMonth = selector ? selector.value : '';
+            if (!currentFinanceMonth) return;
+            
+            document.getElementById('financeTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;">טוען נתונים מכל החניונים, אנא המתן... ⏳</td></tr>';
+            document.getElementById('finance-details-container').style.display = 'none';
+            
+            // 1. Fetch all users
+            const { data: usersData, error: usersErr } = await supabaseClient.from('users').select('*');
+            if (usersErr) {
+                alert("שגיאה בטעינת משתמשים: " + usersErr.message);
+                return;
+            }
+            
+            const groups = {}; 
+            const parkingToGroup = {}; 
+            const parkingNames = {}; 
+            
+            usersData.forEach(u => {
+                const gName = u.group_name || t('no_group');
+                const pId = u.parking_id;
+                
+                if (!groups[gName]) {
+                    groups[gName] = { rate: 2.20, totalFree: 0, totalPaid: 0, totalCost: 0, parkings: {} };
+                }
+                
+                if (u.user_type === 'admin' || u.user_type === 'manager') {
+                    if (u.rate_per_minute) groups[gName].rate = parseFloat(u.rate_per_minute);
+                }
+                
+                if (pId) {
+                    parkingToGroup[pId] = gName;
+                    parkingNames[pId] = u.parking_name || pId;
+                    if (!groups[gName].parkings[pId]) {
+                        groups[gName].parkings[pId] = { name: parkingNames[pId], free: 0, paid: 0, cost: 0 };
+                    }
+                }
+            });
+            
+            // 2. Fetch calls for the selected month
+            const [year, month] = currentFinanceMonth.split('-');
+            const startDate = new Date(year, parseInt(month) - 1, 1);
+            const endDate = new Date(year, parseInt(month), 1);
+            
+            const startISO = startDate.toISOString();
+            const endISO = endDate.toISOString();
+            
+            let allCalls = [];
+            let from = 0;
+            let step = 1000;
+            let fetching = true;
+            
+            while (fetching) {
+                const { data: calls, error: callsErr } = await supabaseClient
+                    .from('calls_log')
+                    .select('*')
+                    .gte('created_at', startISO)
+                    .lt('created_at', endISO)
+                    .range(from, from + step - 1)
+                    .order('created_at', { ascending: true }); // chronological
+                    
+                if (callsErr) {
+                    alert("שגיאה בטעינת שיחות: " + callsErr.message);
+                    return;
+                }
+                
+                if (calls.length > 0) {
+                    allCalls = allCalls.concat(calls);
+                    from += step;
+                }
+                if (calls.length < step) {
+                    fetching = false;
+                }
+            }
+            
+            // 3. Process calls
+            const groupUsage = {}; 
+            
+            allCalls.forEach(c => {
+                const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+                if (isForwarded) return; 
+                
+                const pId = c.parking_id || 'unknown';
+                const gName = parkingToGroup[pId] || t('no_group');
+                
+                if (!groups[gName]) {
+                    groups[gName] = { rate: 2.20, totalFree: 0, totalPaid: 0, totalCost: 0, parkings: {} };
+                }
+                if (!groups[gName].parkings[pId]) {
+                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, free: 0, paid: 0, cost: 0 };
+                }
+                
+                if (!groupUsage[gName]) groupUsage[gName] = 0;
+                
+                const ratePerMin = groups[gName].rate;
+                const ratePerSec = ratePerMin / 60.0;
+                const duration = parseInt(c.call_duration || 0);
+                
+                let cost = 0;
+                let isFree = false;
+                
+                if (groupUsage[gName] < 100) {
+                    groupUsage[gName]++;
+                    isFree = true;
+                } else {
+                    if (duration <= 60) cost = ratePerMin;
+                    else cost = ratePerMin + ((duration - 60) * ratePerSec);
+                }
+                
+                if (isFree) {
+                    groups[gName].totalFree++;
+                    groups[gName].parkings[pId].free++;
+                } else {
+                    groups[gName].totalPaid++;
+                    groups[gName].totalCost += cost;
+                    groups[gName].parkings[pId].paid++;
+                    groups[gName].parkings[pId].cost += cost;
+                }
+            });
+            
+            financeData = groups;
+            renderFinanceTable();
+        }
+        
+        function renderFinanceTable() {
+            const tbody = document.getElementById('financeTableBody');
+            tbody.innerHTML = '';
+            
+            const groupNames = Object.keys(financeData).sort();
+            
+            let htmlContent = '';
+            let hasData = false;
+            
+            groupNames.forEach(gName => {
+                const g = financeData[gName];
+                const totalAI = g.totalFree + g.totalPaid;
+                
+                if (totalAI === 0 && Object.keys(g.parkings).length === 0) return;
+                
+                hasData = true;
+                htmlContent += `
+                    <tr>
+                        <td><strong>${gName}</strong></td>
+                        <td>${totalAI}</td>
+                        <td style="color: var(--accent-blue); font-weight:bold;">${g.totalFree} / 100</td>
+                        <td style="color: var(--accent-red); font-weight:bold;">${g.totalPaid}</td>
+                        <td>${g.rate.toFixed(2)} ₪</td>
+                        <td style="font-weight: bold; color: ${g.totalCost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${g.totalCost.toFixed(2)} ₪</td>
+                        <td>
+                            <button class="btn btn-refresh" style="padding: 4px 8px; font-size: 0.8rem; border-color: var(--accent-blue); color: var(--accent-blue);" onclick="showFinanceDetails('${gName}')">פירוט חניונים</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (!hasData) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">אין נתונים לחודש זה</td></tr>';
+            } else {
+                tbody.innerHTML = htmlContent;
+            }
+        }
+        
+        window.showFinanceDetails = function(gName) {
+            const container = document.getElementById('finance-details-container');
+            const title = document.getElementById('finance-details-title');
+            const tbody = document.getElementById('financeDetailsBody');
+            
+            title.innerText = `פירוט לחניונים: ${gName}`;
+            tbody.innerHTML = '';
+            
+            const g = financeData[gName];
+            if (!g) return;
+            
+            const pIds = Object.keys(g.parkings);
+            let htmlContent = '';
+            
+            pIds.forEach(pId => {
+                const p = g.parkings[pId];
+                const totalAI = p.free + p.paid;
+                
+                if (totalAI === 0) return;
+                
+                htmlContent += `
+                    <tr>
+                        <td><strong>${p.name}</strong> <span style="color: gray; font-size: 0.8em;">(${pId})</span></td>
+                        <td>${totalAI}</td>
+                        <td style="color: var(--accent-blue);">${p.free}</td>
+                        <td style="color: var(--accent-red);">${p.paid}</td>
+                        <td style="font-weight: bold; color: ${p.cost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${p.cost.toFixed(2)} ₪</td>
+                    </tr>
+                `;
+            });
+            
+            if (htmlContent === '') htmlContent = '<tr><td colspan="5" style="text-align:center;">אין שיחות לאף חניון בקבוצה זו</td></tr>';
+            tbody.innerHTML = htmlContent;
+            
+            container.style.display = 'block';
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+        
+        initFinanceMonthSelector();
+
+        // הפעלת האתחול המאובטח שימשוך את המפתחות ויטען את המשתמשים
+        initAdminPanel();
+    
+    </script>
+</main>
+
+    </div>
+
+    <div class="copyright-footer" style="width: 100%; font-size: 0.75rem; color: var(--text-muted); direction: ltr; text-align: center; display: flex; justify-content: center; gap: 10px; align-items: center; padding: 20px 0; margin-top: 40px;">
+        <span><span data-i18n="legal_footer_rights">© 2026 HINT LTD. All Rights Reserved</span></span>
+        <a href="#" id="open-legal-modal" style="color: var(--accent-blue); text-decoration: none;" data-i18n="legal_privacy">מדיניות ופרטיות</a>
+    </div>
+
+    <!-- Legal & Policies Modal -->
+    <div id="legal-modal-overlay" class="legal-modal-overlay">
+        <div class="legal-modal-container">
+            <div class="legal-modal-header">
+                <h2>תקנון ומדיניות</h2>
+                <button class="legal-modal-close-btn" id="legal-close-btn">&times;</button>
+            </div>
+            <div class="legal-modal-body" dir="rtl">
+                <div class="legal-sidebar">
+                    <button class="legal-nav-btn active" data-target="legal-terms" data-i18n="legal_tab_terms">תנאי שימוש</button>
+                    <button class="legal-nav-btn" data-target="legal-privacy" data-i18n="legal_tab_privacy">מדיניות פרטיות</button>
+                    <button class="legal-nav-btn" data-target="legal-software" data-i18n="legal_tab_security">מדיניות תוכנה ואבטחה</button>
+                    <button class="legal-nav-btn" data-target="legal-accessibility" data-i18n="legal_tab_accessibility">הצהרת נגישות</button>
+                </div>
+                <div class="legal-content-area">
+                    <div id="legal-terms" class="legal-section active">
+                        <h3 data-i18n="legal_terms_title">תנאי שימוש (Terms of Use)</h3>
+                        <p>שירותי מערכת ניהול ובקרת החניונים מסופקים על ידי <strong>HINT LTD</strong>.</p>
+                        <p data-i18n="legal_terms_p2">המערכת מסופקת כמות שהיא (As-Is). חברת HINT LTD עושה את מירב המאמצים על מנת להבטיח את רציפות ותקינות השירות, אך אינה נושאת באחריות לכל נזק, ישיר או עקיף, העלול להיגרם משימוש במערכת או מתקלות טכניות.</p>
+                        <p data-i18n="legal_terms_p3">עם זאת, אנו מתחייבים לספק שירות מהיר ולתקן באגים או תקלות בתוכנה באופן המהיר והמקצועי ביותר על מנת להבטיח חווית משתמש חלקה.</p>
+                    </div>
+                    <div id="legal-privacy" class="legal-section">
+                        <h3 data-i18n="legal_privacy_title">מדיניות פרטיות (Privacy Policy)</h3>
+                        <p data-i18n="legal_privacy_p1">במסגרת תפעול החניונים, המערכת אוספת ושומרת נתונים תפעוליים החיוניים למתן השירות, לרבות:</p>
+                        <ul>
+                            <li data-i18n="legal_privacy_li1">מספרי רכבים של הנכנסים והיוצאים מן החניון.</li>
+                            <li data-i18n="legal_privacy_li2">שמות הנהגים והרשומות המקושרות אליהם (במקרה של מנויים או מורשים).</li>
+                            <li data-i18n="legal_privacy_li3">תיעוד של שיחות אינטרקום, תמלולים, ולוגים של פעולות במערכת.</li>
+                        </ul>
+                        <p data-i18n="legal_privacy_p2">נתונים אלו נשמרים תחת נהלי אבטחה קפדניים ומשמשים אך ורק לצורך תפעול ובקרת החניון, ניתוח נתונים סטטיסטיים, ושיפור השירות.</p>
+                    </div>
+                    <div id="legal-software" class="legal-section">
+                        <h3 data-i18n="legal_security_title">מדיניות התוכנה (Software & Security Policy)</h3>
+                        <p>כל זכויות הקניין הרוחני במערכת, לרבות קוד המקור, העיצוב, והלוגיקה, שייכות במלואן ל-<strong>HINT LTD</strong>.</p>
+                        <p data-i18n="legal_security_li2">חל איסור מוחלט לבצע הנדסה לאחור (Reverse Engineering), להעתיק, לשכפל, או לעשות שימוש מסחרי בקוד המערכת או בחלקים ממנה ללא אישור מפורש בכתב מ-HINT LTD.</p>
+                        <p><strong>אבטחת מידע ואיפוס סיסמאות:</strong> מטעמי אבטחת מידע קפדניים, פעולות רגישות כגון איפוס סיסמה או מחיקת משתמשים יכולות להתבצע אך ורק על ידי מנהלי מערכת מורשים מטעם HINT LTD.</p>
+                    </div>
+                    <div id="legal-accessibility" class="legal-section">
+                        <h3 data-i18n="legal_access_title">הצהרת נגישות (Accessibility Statement)</h3>
+                        <p data-i18n="legal_access_p1">אנו רואים חשיבות רבה במתן שירות שוויוני ונגיש לכלל המשתמשים. המערכת תוכננה מראש לספק חווית שימוש נוחה ומונגשת, וכוללת בין היתר את ההתאמות הבאות:</p>
+                        <ul>
+                            <li><strong>התאמת תצוגה:</strong> תמיכה בשינוי רקע המערכת מכהה לבהיר (Dark/Light mode) לפי העדפת המשתמש.</li>
+                            <li><strong>קריאות וטקסט:</strong> תמיכה בהגדלה והקטנה של המלל בדפדפן ללא פגיעה במבנה האתר.</li>
+                            <li><strong>ריבוי שפות:</strong> תמיכה מובנית בשפות שונות להתמצאות נוחה בממשק.</li>
+                            <li><strong>חיווי קולי למוקד:</strong> צליל התראה בכניסת שיחה חדשה במוקד, המנגיש את חיווי השיחות גם ללא קשר עין רציף עם המסך.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="translations.js?v=1.1.20"></script>
+    <script src="app.js?v=226.1.20"></script>
+
+<script>
+    function selectAdminMobile(tabId, view, title) {
+        // Find the corresponding desktop tab button and simulate a click
+        const tabs = {
+            'users': 0,
+            'events': 1,
+            'whitelist': 2,
+            'blacklist': 3,
+            'finance': 4
+        };
+        const btnIndex = tabs[tabId];
+        const buttons = document.querySelectorAll('.admin-tab-btn');
+        if (buttons[btnIndex]) {
+            buttons[btnIndex].click();
+        }
+        
+        // Update the dropdown text
+        document.getElementById('mobile-dropdown-current').innerText = title;
+        
+        // Hide the dropdown
+        const container = document.getElementById('mobile-dropdown-container');
+        if (container) {
+            container.classList.remove('open');
+        }
+        
+        // Manage mobile views for 'users' tab
+        if (tabId === 'users') {
+            if (view === 'table') {
+                document.body.classList.add('mobile-users-table');
+                document.body.classList.remove('mobile-users-form');
+            } else if (view === 'form') {
+                document.body.classList.add('mobile-users-form');
+                document.body.classList.remove('mobile-users-table');
+            }
+        } else {
+            // Remove view classes for other tabs
+            document.body.classList.remove('mobile-users-table');
+            document.body.classList.remove('mobile-users-form');
+        }
+    }
+    
+    // Set initial view on mobile
+    if (window.innerWidth <= 900) {
+        document.body.classList.add('mobile-users-table');
+    }
+</script>
+<style>
+    @media (max-width: 900px) {
+        body.mobile-users-table #users-form-container { display: none !important; }
+        body.mobile-users-form #users-table-container { display: none !important; }
+        
+        /* Make form full width if it's the only one showing */
+        body.mobile-users-form .layout, body.mobile-users-table .layout {
+            display: block !important;
+        }
+        
+        /* Hide desktop tabs completely on mobile since we have the dropdown now */
+        .tabs { display: none !important; }
+    }
+    body.admin-page { padding-bottom: 100px !important; }
+    </style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const evPlateInput = document.getElementById("ev_plate");
+    if (evPlateInput) {
+        // Create an alert span if it doesn't exist
+        let alertSpan = document.getElementById("ev_plate_alert");
+        if (!alertSpan) {
+            alertSpan = document.createElement("div");
+            alertSpan.id = "ev_plate_alert";
+            alertSpan.style.color = "var(--accent-red)";
+            alertSpan.style.fontWeight = "bold";
+            alertSpan.style.marginTop = "5px";
+            alertSpan.style.display = "none";
+            evPlateInput.parentNode.appendChild(alertSpan);
+        }
+
+        evPlateInput.addEventListener("input", (e) => {
+            const plate = e.target.value.trim();
+            alertSpan.style.display = "none";
+            
+            if (!plate) return;
+            
+            // Access cachedBlocked and cachedAuthorized from app.js (which is global)
+            if (window.cachedBlocked && window.cachedBlocked.length > 0) {
+                const blocked = window.cachedBlocked.find(b => b.plate === plate);
+                if (blocked) {
+                    alertSpan.innerHTML = `רכב חסום! סיבה: ${blocked.reason || 'ללא'}`;
+                    alertSpan.style.display = "block";
+                    alertSpan.style.color = "var(--accent-red)";
+                    
+                    document.getElementById("ev_summary").value = `רכב חסום: ${blocked.reason || 'ללא'}`;
+                    document.getElementById("ev_dname").value = blocked.driver_name || '';
+                    return;
+                }
+            }
+            
+            if (window.cachedAuthorized && window.cachedAuthorized.length > 0) {
+                const auth = window.cachedAuthorized.find(a => a.plate === plate);
+                if (auth) {
+                    alertSpan.innerHTML = `רכב מורשה! הערות: ${auth.notes || 'ללא'}`;
+                    alertSpan.style.display = "block";
+                    alertSpan.style.color = "var(--accent-green)";
+                    
+                    document.getElementById("ev_summary").value = `רכב מורשה: ${auth.notes || 'ללא'}`;
+                    document.getElementById("ev_dname").value = auth.driver_name || '';
+                    return;
+                }
+            }
+        });
+    }
+});
+</script>
+
+</body>
+</html>
