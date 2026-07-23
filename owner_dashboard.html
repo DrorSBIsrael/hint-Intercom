@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smarter Intercom Dashboard</title>
-    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=226">
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=4.0.1">
     <!-- External fonts removed for offline support; using system fonts instead -->
     <script src="supabase.js"></script>
     
-    <script src="translations.js"></script>
+
     <script src="security.js?v=2"></script>
     <script>
         // Check permissions
@@ -20,7 +20,7 @@
 
 </head>
 
-<body class="dark-mode owner-page" id="app-body">
+<body class="dark-mode owner-page show-ai-cost" id="app-body">
     <div id="global-loader" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; flex-direction: column;">
         <img src="logo_nb.png" alt="Loading" style="width: 150px; animation: pulse-logo 1.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">
         <div style="color: white; margin-top: 25px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">טוען נתונים...</div>
@@ -34,16 +34,25 @@
         <header class="dashboard-header">
             <div class="header-right">
                 <button id="logout-btn" class="btn-secondary" data-i18n="logout_btn">יציאה</button>
-                <div class="font-controls">
-                    <button id="font-increase" title="הגדל פונט">A+</button>
-                    <button id="font-decrease" title="הקטן פונט">A-</button>
+                <div class="font-controls" style="display: flex; align-items: center; gap: 8px; background: var(--bg-hover); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); pointer-events: none;">A</span>
+                    <input type="range" id="font-size-slider" min="12" max="24" step="1" value="16" style="width: 80px; accent-color: var(--text-color); cursor: pointer; margin: 0;">
+                    <span style="font-size: 1.15rem; font-weight: bold; color: var(--text-color); pointer-events: none;">A</span>
                     <div class="lang-dropdown-container" style="position: relative; display: inline-block;">
-                        <button id="current-lang-btn" title="שפה / Language" style="min-width: 80px;">🇮🇱 HE ▾</button>
-                        <div id="lang-dropdown-menu" class="hidden" style="position: absolute; top: 100%; right: 0; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width: 80px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); flex-direction: column; margin-top: 5px;">
-                            <button class="lang-btn" data-lang="he" title="עברית" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇮🇱 HE</button>
-                            <button class="lang-btn" data-lang="ar" title="العربية" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇦🇪 AR</button>
-                            <button class="lang-btn" data-lang="en" title="English" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇺🇸 EN</button>
-                            <button class="lang-btn" data-lang="ru" title="Русский" style="border: none; width: 100%; text-align: center; border-radius: 0; margin: 0;">🇷🇺 RU</button>
+                        <button id="current-lang-btn" title="שפה / Language" style="min-width: 80px;">עברית ▾</button>
+                        <div id="lang-dropdown-menu" class="hidden" style="position: absolute; top: 100%; right: 0; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--border-radius); min-width: 110px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.2); flex-direction: column; margin-top: 5px; padding: 4px 0;">
+                            <button class="lang-btn" data-lang="he" title="עברית" style="border: none; width: 100%; text-align: right; border-radius: 0; margin: 0; padding: 8px 15px; background: transparent; color: var(--text-color); font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                                <span style="pointer-events: none;">עברית</span><span class="lang-check" data-for="he" style="opacity: 0; pointer-events: none;">✓</span>
+                            </button>
+                            <button class="lang-btn" data-lang="en" title="English" style="border: none; width: 100%; text-align: right; border-radius: 0; margin: 0; padding: 8px 15px; background: transparent; color: var(--text-color); font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                                <span style="pointer-events: none;">English</span><span class="lang-check" data-for="en" style="opacity: 0; pointer-events: none;">✓</span>
+                            </button>
+                            <button class="lang-btn" data-lang="ar" title="العربية" style="border: none; width: 100%; text-align: right; border-radius: 0; margin: 0; padding: 8px 15px; background: transparent; color: var(--text-color); font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                                <span style="pointer-events: none;">العربية</span><span class="lang-check" data-for="ar" style="opacity: 0; pointer-events: none;">✓</span>
+                            </button>
+                            <button class="lang-btn" data-lang="ru" title="Русский" style="border: none; width: 100%; text-align: right; border-radius: 0; margin: 0; padding: 8px 15px; background: transparent; color: var(--text-color); font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                                <span style="pointer-events: none;">Русский</span><span class="lang-check" data-for="ru" style="opacity: 0; pointer-events: none;">✓</span>
+                            </button>
                         </div>
                     </div>
                     <button id="theme-toggle" title="החלף עיצוב">🌓</button>
@@ -51,25 +60,28 @@
                 
             </div>
             <div class="header-center" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; align-items: center; white-space: nowrap; pointer-events: none;">
-                <div id="greeting-container" style="text-align: center; font-size: 1.2rem; font-weight: 500; display: flex; flex-direction: column; justify-content: center; pointer-events: auto;"></div>
             </div>
             <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
-                                <div class="global-clock" id="global-clock" style="margin: 0;"></div>
-                <div id="role-nav-buttons" style="display: flex; gap: 10px; margin-right: 15px; position: relative; z-index: 99;">
-                    <button id="nav-admin-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/admin_dashboard.html'">אדמין</button>
-                    <button id="nav-manager-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/owner_dashboard.html'">מנהל</button>
-                    <button id="nav-operator-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/index.html'">מוקד</button>
-                </div>
+                <div class="global-clock" id="global-clock" style="margin: 0;"></div>
+                <div style="width: 1px; height: 24px; background-color: var(--border-color); margin: 0 5px;"></div>
                 <div id="global-date" class="global-date" style="font-size: 1.4rem; font-weight: 600; opacity: 1; color: #ffffff !important;"></div>
                 <svg id="connection-status-icon" title="מצב חיבור" style="width: 22px; height: 22px; fill: #30d158; margin-left: 20px; margin-top: 2px;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 21c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm-4.6-5.6c2.5-2.5 6.6-2.5 9.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-3.3-3.3-8.7-3.3-12 0-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0zm-3.5-3.5c4.5-4.5 11.7-4.5 16.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-5.3-5.3-13.8-5.3-19.1 0-.4.4-.4 1 0 1.4.4.3 1 .3 1.5 0zm-3.5-3.5c6.4-6.4 16.8-6.4 23.2 0 .4.4 1 .4 1.4 0 .4-.4.4-1 0-1.4-7.2-7.2-18.8-7.2-26 0-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0z"/>
                 </svg>
             </div>
 
+        <!-- Mobile Elements (Greeting & Nav Buttons) -->
+        <div class="greeting-container mobile-only" style="text-align: center; margin: 15px 0 10px 0; padding: 0 15px;"></div>
+        <div class="role-nav-buttons mobile-only" style="display: none; gap: 10px; padding: 0 15px; margin-bottom: 10px; justify-content: center; position: relative; z-index: 99999; pointer-events: auto;">
+            <a href="/admin_dashboard.html" class="nav-role-btn nav-admin-btn" style="display: none; text-decoration: none; line-height: 24px;">אדמין</a>
+            <a href="/owner_dashboard.html" class="nav-role-btn nav-manager-btn" style="display: none; text-decoration: none; line-height: 24px;">מנהל</a>
+            <a href="/index.html" class="nav-role-btn nav-operator-btn" style="display: none; text-decoration: none; line-height: 24px;">מוקד</a>
+        </div>
+
         <!-- Mobile Dropdown Menu -->
         <div class="mobile-only mobile-dropdown-container" id="mobile-dropdown-container" >
             <div class="mobile-dropdown-btn" onclick="toggleMobileDropdown()">
-                <span id="mobile-dropdown-current">מוצרים</span>
+                <span id="mobile-dropdown-current">עליות וצריכת AI</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="mobile-dropdown-menu">
@@ -145,7 +157,8 @@
             <img src="background.png" class="mobile-home-bg" alt="Home Background">
             
             <!-- Stats Controls -->
-            <div class="stats-controls" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div class="stats-controls" style="position: relative; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div id="greeting-container" class="desktop-only" style="position: absolute; left: 50%; transform: translateX(-50%); pointer-events: auto; z-index: 10;"></div>
                 <div id="parking-selector-container" style="display: flex; align-items: center; gap: 10px;">
                     <select id="parking-selector" class="adv-search-input" style="width: auto; cursor: pointer; padding: 5px 10px; font-weight: bold;">
                         <option value="all" data-i18n="all_parkings">כל החניונים</option>
@@ -168,7 +181,13 @@
                     <button id="apply-custom-date" class="btn-primary" style="padding: 5px 15px;">החל</button>
                 </div>
                 
-                <div class="action-buttons-left" style="margin-right: auto; display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="action-buttons-left" style="margin-right: auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <div id="role-nav-buttons" class="desktop-only" style="display: none; gap: 10px; margin-right: auto; position: relative; z-index: 99;">
+                        <button id="nav-admin-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/admin_dashboard.html'">אדמין</button>
+                        <button id="nav-manager-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/owner_dashboard.html'">מנהל</button>
+                        <button id="nav-operator-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/index.html'">מוקד</button>
+                    </div>
+                    <div style="width: 1px; height: 38px; background-color: var(--border-color); margin: 0 5px;"></div>
                     <button class="btn-primary square-btn" onclick="exportTableToCSV('calls-table', 'calls_log.csv')" title="ייצוא כל השיחות">
                         <span>CSV</span>
                     </button>
@@ -281,6 +300,7 @@
             </div>
 
             <!-- List Management Section -->
+            <hr class="desktop-only section-divider" style="border: 0; border-top: 1px solid var(--border-color); margin: 30px 0;">
             <div id="mobile-rules-section" class="graph-section" style="margin-top: 30px;">
                 <div class="section-header" style="margin-bottom: 20px;">
                     <h2 data-i18n="manage_lists_title">ניהול מורשים וחסומים</h2>
@@ -310,7 +330,7 @@
                         </form>
                         
                         <!-- List -->
-                        <div style="flex: 1; overflow-y: auto; max-height: 320px; padding-right: 5px;">
+                        <div style="height: 250px; overflow-y: auto; padding-right: 5px;">
                             <ul id="owner-blocked-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
                                 <!-- Items injected by JS -->
                             </ul>
@@ -339,7 +359,7 @@
                         </form>
                         
                         <!-- List -->
-                        <div style="flex: 1; overflow-y: auto; max-height: 320px; padding-right: 5px;">
+                        <div style="height: 250px; overflow-y: auto; padding-right: 5px;">
                             <ul id="owner-authorized-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
                                 <!-- Items injected by JS -->
                             </ul>
@@ -350,6 +370,7 @@
             </div>
 
             <!-- All Calls & Search -->
+            <hr class="desktop-only section-divider" style="border: 0; border-top: 1px solid var(--border-color); margin: 30px 0;">
             <div class="all-calls-section" style="margin-top: -20px;">
                 <div class="section-header">
                     <h2 data-i18n="all_calls_title">כל השיחות</h2>
@@ -409,7 +430,8 @@
                             </select>
                         </div>
                     </div>
-                    <div class="table-wrapper">
+                    <ul id="mobile-calls-list" class="call-list" style="display: none;"></ul>
+                    <div class="table-wrapper desktop-calls-table">
                         <table id="calls-table">
                             <thead>
                                 <tr>
@@ -433,10 +455,11 @@
             </div>
 
         <!-- Graph Section -->
+            <hr class="desktop-only section-divider" style="border: 0; border-top: 1px solid var(--border-color); margin: 30px 0;">
             <div id="mobile-load-graph-section" class="graph-section" style="margin-top: -20px;">
                 <div class="section-header">
                     <h2 data-i18n="graph_title">עומס שיחות</h2>
-                    <div class="chart-legend" style="display:flex; gap: 16px; margin-left: auto; margin-right: 20px; font-size: 0.9rem;">
+                    <div class="chart-legend" style="display:flex; gap: 16px; margin-left: auto; margin-right: 20px; font-size: 0.9rem; align-items: center;">
                         <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-green); border-radius:2px; margin-left:6px;"></span>AI</div>
                         <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-blue); border-radius:2px; margin-left:6px;"></span>מוקד</div>
                     </div>
@@ -546,7 +569,7 @@
     </div>
 
     <script src="translations.js?v=1.1.23"></script>
-    <script src="app.js?v=226.1.23"></script>
+    <script src="app.js?v=4.0.8"></script>
     <script>
         if (sessionStorage.getItem('intercom_user_role') === 'admin') {
             const adminBtn = document.getElementById('nav-admin-btn');

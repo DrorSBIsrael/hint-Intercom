@@ -1,7 +1,39 @@
+// Mobile Detection
+if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+    document.documentElement.classList.add('is-mobile');
+}
+
 // Utility to fix API dates that are stored as local time but returned as UTC
 function fixApiDates(data) {
-    return data; // Supabase now returns correct UTC times
+    if (!data || !Array.isArray(data)) return data;
+    data.forEach(item => {
+        if (item.created_at && item.created_at.endsWith('+00:00')) {
+            // Remove +00:00 so the browser treats it as local time instead of UTC!
+            item.created_at = item.created_at.replace('+00:00', '');
+        }
+    });
+    return data;
 }
+// Cache Buster for Old Parking Format or Missing Names
+(function checkOldParkingFormat() {
+    const parkingsStr = sessionStorage.getItem('intercom_allowed_parkings');
+    if (parkingsStr) {
+        try {
+            const arr = JSON.parse(parkingsStr);
+            if (arr.length > 0) {
+                const first = arr[0];
+                if (typeof first === 'string' || (typeof first === 'object' && !first.name)) {
+                    sessionStorage.removeItem('intercom_session_token');
+                    sessionStorage.removeItem('intercom_allowed_parkings');
+                    if (window.location.pathname.includes('owner_dashboard.html')) {
+                        window.location.href = 'index.html';
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+})();
+
 // State
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
 
@@ -39,10 +71,10 @@ function updateUIForLanguage() {
     // Update the dropdown button text
     const currentLangBtn = document.getElementById('current-lang-btn');
     if (currentLangBtn) {
-        if (currentLang === 'he') currentLangBtn.innerText = '🇮🇱 HE ▾';
-        else if (currentLang === 'ar') currentLangBtn.innerText = '🇦🇪 AR ▾';
-        else if (currentLang === 'en') currentLangBtn.innerText = '🇺🇸 EN ▾';
-        else if (currentLang === 'ru') currentLangBtn.innerText = '🇷🇺 RU ▾';
+        if (currentLang === 'he') currentLangBtn.innerText = 'עברית ▾';
+        else if (currentLang === 'ar') currentLangBtn.innerText = 'العربية ▾';
+        else if (currentLang === 'en') currentLangBtn.innerText = 'English ▾';
+        else if (currentLang === 'ru') currentLangBtn.innerText = 'Русский ▾';
     }
     
     // Update placeholders
@@ -59,12 +91,16 @@ function updateUIForLanguage() {
     
     document.querySelectorAll('.lang-btn').forEach(btn => {
         if (btn.id !== 'current-lang-btn') {
-            if (btn.getAttribute('data-lang') === currentLang) {
+            const langCode = btn.getAttribute('data-lang');
+            const checkIcon = btn.querySelector('.lang-check');
+            if (langCode === currentLang) {
                 btn.style.opacity = '1';
-                btn.style.borderBottom = '2px solid var(--accent-blue)';
+                btn.style.background = 'rgba(255, 255, 255, 0.05)';
+                if (checkIcon) checkIcon.style.opacity = '1';
             } else {
-                btn.style.opacity = '0.5';
-                btn.style.borderBottom = 'none';
+                btn.style.opacity = '0.7';
+                btn.style.background = 'transparent';
+                if (checkIcon) checkIcon.style.opacity = '0';
             }
         }
     });
@@ -247,8 +283,8 @@ function showScreen(screenId) {
 // ----------------------------------------------------
 function updateClock() {
     const now = new Date();
-    const timeStr = now.toLocaleTimeString('he-IL'); // HH:MM:SS
-    const dateStr = now.toLocaleDateString('he-IL'); // DD.MM.YYYY
+    const timeStr = now.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }); // HH:MM:SS
+    const dateStr = now.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' }); // DD.MM.YYYY
     const elGlobalClock = document.getElementById('global-clock');
     const elGlobalDate = document.getElementById('global-date');
     if (elGlobalClock) {
@@ -261,8 +297,8 @@ function updateClock() {
     }
     
     // Update Greeting
-    const greetingEl = document.getElementById('greeting-container');
-    if (greetingEl) {
+    const greetingEls = document.querySelectorAll('.greeting-container, #greeting-container');
+    if (greetingEls.length > 0) {
         const hour = now.getHours();
         let transKey = 'good_night';
         if (hour >= 5 && hour < 12) transKey = 'good_morning';
@@ -280,20 +316,20 @@ function updateClock() {
         }
         
         // As requested: instead of "All Parkings" (כל החניות), write the username.
-        // We will stack them: [Greeting] over [Username]
-        let htmlStr = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;">`;
+        // We will put them on a single line: [Greeting] [Username]
+        let htmlStr = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; width: 100%;">`;
         
-        // Parking name is now displayed next to the theme toggle
-        
-        htmlStr += `<span style="font-size: 1.6em; font-weight: 700; color: var(--text-highlight); line-height: 1;">${t(transKey)}</span>`;
+        htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; color: var(--text-highlight); line-height: 1;">${t(transKey)}</span>`;
         
         if (username) {
-            htmlStr += `<span style="font-size: 1.2em; opacity: 0.85; line-height: 1;">${username}</span>`;
+            htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; opacity: 0.85; line-height: 1;">${username}</span>`;
         }
-        
+        if (parkingName) {
+            htmlStr += `<span style="font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin-top: 2px;">ב${parkingName}</span>`;
+        }
         htmlStr += `</div>`;
         
-        greetingEl.innerHTML = htmlStr;
+        greetingEls.forEach(el => el.innerHTML = htmlStr);
     }
 }
 setInterval(updateClock, 1000);
@@ -462,8 +498,7 @@ document.addEventListener('keydown', (e) => {
 // Theme & Accessibility
 // ----------------------------------------------------
 const themeToggle = document.getElementById('theme-toggle');
-const fontIncrease = document.getElementById('font-increase');
-const fontDecrease = document.getElementById('font-decrease');
+const fontSizeSlider = document.getElementById('font-size-slider');
 const appBody = document.getElementById('app-body');
 
 let baseFontSize = 16;
@@ -472,6 +507,9 @@ const savedFontSize = localStorage.getItem('intercom_font_size');
 if (savedFontSize) {
     baseFontSize = parseInt(savedFontSize, 10);
     document.documentElement.style.setProperty('--base-font-size', `${baseFontSize}px`);
+    if (fontSizeSlider) fontSizeSlider.value = baseFontSize;
+} else {
+    if (fontSizeSlider) fontSizeSlider.value = 16;
 }
 
 
@@ -487,21 +525,13 @@ themeToggle.addEventListener('click', () => {
     }
 });
 
-fontIncrease.addEventListener('click', () => {
-    if (baseFontSize < 24) {
-        baseFontSize += 2;
+if (fontSizeSlider) {
+    fontSizeSlider.addEventListener('input', (e) => {
+        baseFontSize = parseInt(e.target.value, 10);
         document.documentElement.style.setProperty('--base-font-size', `${baseFontSize}px`);
         localStorage.setItem('intercom_font_size', baseFontSize);
-    }
-});
-
-fontDecrease.addEventListener('click', () => {
-    if (baseFontSize > 12) {
-        baseFontSize -= 2;
-        document.documentElement.style.setProperty('--base-font-size', `${baseFontSize}px`);
-        localStorage.setItem('intercom_font_size', baseFontSize);
-    }
-});
+    });
+}
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     // Clear 2FA inputs
@@ -533,30 +563,47 @@ async function pollOperatorCallsFast() {
         opCalls = fixApiDates(opCalls);
         opCalls = filterDataByAllowedParkings(opCalls);
         
-        let shouldUpdate = false;
+        let shouldRender = false;
+        let shouldBeep = false;
+        window.notifiedCallIds = window.notifiedCallIds || new Set();
         
         opCalls.forEach(opCall => {
             const existingIdx = allCalls.findIndex(c => String(c.id) === String(opCall.id));
             if (existingIdx === -1) {
-                // Completely new call
+                // Completely new call (or old one falling out of cache)
                 opCall.isNew = true;
                 allCalls.unshift(opCall);
-                shouldUpdate = true;
+                shouldRender = true;
+                
+                if (!window.notifiedCallIds.has(String(opCall.id))) {
+                    const isRecent = (Date.now() - new Date(opCall.created_at).getTime()) < 1000 * 60 * 60; // 1 hour
+                    if (isRecent) {
+                        shouldBeep = true;
+                    }
+                    window.notifiedCallIds.add(String(opCall.id));
+                }
             } else {
                 // Exists, check if it just became forwarded
                 const oldCall = allCalls[existingIdx];
                 if (String(oldCall.is_forwarded).toLowerCase() !== 'true') {
                     opCall.isNew = true;
                     allCalls[existingIdx] = opCall;
-                    shouldUpdate = true;
+                    shouldRender = true;
+                    
+                    if (!window.notifiedCallIds.has(String(opCall.id))) {
+                        shouldBeep = true;
+                        window.notifiedCallIds.add(String(opCall.id));
+                    }
                 }
             }
         });
         
-        if (shouldUpdate) {
+        if (shouldRender) {
             allCalls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            playNotificationSound();
             applyFilters();
+        }
+        if (shouldBeep) {
+            playNotificationSound();
         }
     } catch (e) {
         console.error("Fast polling error:", e);
@@ -574,8 +621,7 @@ function filterDataByAllowedParkings(dataArray) {
     if (allowedParkingsStr) {
         try { allowedParkings = JSON.parse(allowedParkingsStr); } catch(e) {}
     }
-    
-    if (allowedParkings.length === 0) return dataArray; // Originally, empty meant show all
+    if (allowedParkings.length === 0) return []; // If operator has no parkings assigned, they see nothing
     
     const allowedStr = allowedParkings.map(p => String(p.id || p));
     return dataArray.filter(item => allowedStr.includes(String(item.parking_id)));
@@ -596,21 +642,21 @@ async function fetchInitialCalls() {
             if (allCalls.length === 0) {
                 allCalls = newCalls;
             } else {
-                // Check if any call is new or became forwarded
-                if (newCalls.length > 0 && newCalls[0].id !== allCalls[0].id) {
-                    if (String(newCalls[0].is_forwarded).toLowerCase() === 'true') {
+                // Check for genuinely new calls
+                const genuinelyNewCalls = newCalls.filter(nc => !allCalls.find(oc => String(oc.id) === String(nc.id)));
+                if (genuinelyNewCalls.length > 0) {
+                    if (genuinelyNewCalls.some(nc => String(nc.is_forwarded).toLowerCase() === 'true')) {
                         playSound = true;
                     }
-                } else {
-                    // Check top 10 for updates to is_forwarded
-                    for (let i = 0; i < Math.min(newCalls.length, 10); i++) {
-                        const nc = newCalls[i];
-                        const oc = allCalls.find(c => c.id === nc.id);
-                        if (oc && String(oc.is_forwarded).toLowerCase() === 'false' && String(nc.is_forwarded).toLowerCase() === 'true') {
-                            nc.isNew = true;
-                            playSound = true;
-                            // continue checking others just in case, but one playSound is enough
-                        }
+                }
+                
+                // Check top 10 for updates to is_forwarded
+                for (let i = 0; i < Math.min(newCalls.length, 10); i++) {
+                    const nc = newCalls[i];
+                    const oc = allCalls.find(c => String(c.id) === String(nc.id));
+                    if (oc && String(oc.is_forwarded).toLowerCase() === 'false' && String(nc.is_forwarded).toLowerCase() === 'true') {
+                        nc.isNew = true;
+                        playSound = true;
                     }
                 }
                 
@@ -621,7 +667,17 @@ async function fetchInitialCalls() {
                     newCalls[i].isNew = true;
                 }
                 
-                allCalls = newCalls;
+                // Preserve old operator calls that might not be in the top 2000 recent calls
+                const existingOpCalls = allCalls.filter(c => String(c.is_forwarded).toLowerCase() === 'true');
+                const merged = [...newCalls];
+                existingOpCalls.forEach(opc => {
+                    if (!merged.find(mc => String(mc.id) === String(opc.id))) {
+                        merged.push(opc);
+                    }
+                });
+                merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                allCalls = merged;
             }
             
             const role = sessionStorage.getItem('intercom_user_role');
@@ -634,10 +690,14 @@ async function fetchInitialCalls() {
             
             const parkingSelect = document.getElementById('parking-selector');
             if (parkingSelect && parkingSelect.options.length <= 1) {
-                // Include both allowed parkings and lots from calls to ensure we show all options
-                let lots = [...new Set(allCalls.map(c => c.parking_id))].filter(Boolean);
-                if (role !== 'admin' && allowedParkings.length > 0) {
-                    lots = [...new Set([...lots, ...allowedStr])].filter(Boolean);
+                let lots = [];
+                if (role === 'admin') {
+                    lots = [...new Set(allCalls.map(c => c.parking_id))].filter(Boolean);
+                    if (allowedParkings.length > 0) {
+                        lots = [...new Set([...lots, ...allowedStr])].filter(Boolean);
+                    }
+                } else {
+                    lots = [...allowedStr];
                 }
                 
                 parkingSelect.innerHTML = '';
@@ -649,13 +709,13 @@ async function fetchInitialCalls() {
                     const opt = document.createElement('option');
                     opt.value = lot;
                     
-                    let lotName = "";
-                    const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
-                    if (matchingParking && matchingParking.name) {
-                        lotName = ` - ${matchingParking.name}`;
+                    let name = typeof getParkingNameById === 'function' ? getParkingNameById(lot) : lot;
+                    if (name === String(lot)) {
+                        opt.innerText = `${name}`;
+                    } else {
+                        opt.innerText = `${name} (מס' ${lot})`;
                     }
-                    
-                    opt.innerText = `חניון ${lot}${lotName}`;
+
                     if (lot === currentParkingId || lots.length === 1) {
                         opt.selected = true;
                         currentParkingId = lot; // Auto-select if only 1 option
@@ -674,20 +734,32 @@ async function fetchInitialCalls() {
                 lots.forEach(lot => {
                     const opt = document.createElement('option');
                     opt.value = lot;
-                    let lotName = "";
-                    const matchingParking = allowedParkings.find(p => String(p.id || p) === String(lot));
-                    if (matchingParking && matchingParking.name) {
-                        lotName = ` - ${matchingParking.name}`;
-                    }
-                    opt.innerText = `חניון ${lot}${lotName}`;
+                    opt.innerText = typeof getParkingNameById === 'function' ? getParkingNameById(lot) : lot;
                     sel.appendChild(opt);
                 });
             });
+
+            // Populate manual event parking datalist
+            const evPidList = document.getElementById('ev_pid_list');
+            if (evPidList) {
+                evPidList.innerHTML = '';
+                lots.forEach(lot => {
+                    const opt = document.createElement('option');
+                    opt.value = lot;
+                    opt.innerText = typeof getParkingNameById === 'function' ? getParkingNameById(lot) : lot;
+                    evPidList.appendChild(opt);
+                });
+            }
         }
         
         populateActionDbDropdown(allCalls);
         
         applyFilters();
+        
+        if (typeof refreshMobileDropdownNames === 'function') {
+            refreshMobileDropdownNames();
+        }
+        
         calculateAICosts(allCalls);
         
         if (playSound && !isInitialLoad) {
@@ -698,10 +770,24 @@ async function fetchInitialCalls() {
     }
 }
 
+window.dbParkingNames = {};
+
+async function fetchParkingNames() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/parkings?t=${Date.now()}`);
+        if (res.ok) {
+            window.dbParkingNames = await res.json();
+        }
+    } catch (e) {
+        console.error("Failed to fetch parking names", e);
+    }
+}
+
 async function initDashboard() {
-    // Fetch caches before initial calls so that alerts render immediately
-    await fetchAndRenderActionList('blocked');
-    await fetchAndRenderActionList('authorized');
+    await fetchParkingNames();
+    // Fetch caches independently so they don't block initial calls
+    fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e));
+    fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e));
     
     await fetchInitialCalls();
     
@@ -715,8 +801,13 @@ async function initDashboard() {
             supabaseClient
               .channel('realtime-calls')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'calls_log' }, payload => {
-                const newCall = payload.new;
+                let newCall = payload.new;
                 if (!newCall) return; // handles DELETE where payload.new is null
+                
+                // Fix timezone offset for incoming realtime calls
+                if (newCall.created_at && newCall.created_at.endsWith('+00:00')) {
+                    newCall.created_at = newCall.created_at.replace('+00:00', '');
+                }
                 
                 // Convert booleans to strings to match existing logic if needed
                 if (typeof newCall.is_forwarded === 'boolean') {
@@ -764,25 +855,34 @@ async function initDashboard() {
               })
               .subscribe();
               
-            console.log("Supabase Realtime connected!");
+            supabaseClient
+              .channel('realtime-lists')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'blacklist' }, payload => {
+                  if (typeof fetchAndRenderActionList === 'function') {
+                      fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e));
+                  }
+              })
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'whitelist' }, payload => {
+                  if (typeof fetchAndRenderActionList === 'function') {
+                      fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e));
+                  }
+              })
+              .subscribe();
+              
+            console.log("Supabase Realtime connected for calls and lists!");
         }
     } catch(e) {
         console.error("Failed to setup realtime", e);
     }
     
-    // Always fallback to polling to guarantee updates even if realtime drops
-    setInterval(fetchInitialCalls, 30000);
+    // Initialize the single global polling timer
+    startGlobalPolling();
     
-    // Aggressive fast polling for operator calls ONLY (every 3 seconds)
-    setInterval(pollOperatorCallsFast, 3000);
+    // Attach guards to all scrollable lists and tables
+    setupGlobalListGuards();
     
-    // Setup owner forms and polling
+    // Setup owner forms
     setupOwnerListForms();
-    setInterval(() => {
-        fetchAndRenderActionList('blocked');
-        fetchAndRenderActionList('authorized');
-    }, 30000);
-    
     // Initial fetch done at start of initDashboard
 }
 
@@ -849,6 +949,16 @@ function applyFilters() {
     renderPopularTimes();
     updateLanesList();
     
+    // Re-render action lists to reflect dynamic entry/exit times from allCalls
+    if (typeof cachedBlocked !== 'undefined' && cachedBlocked) {
+        renderActionList('blocked', cachedBlocked);
+        if (typeof renderOwnerActionList === 'function') renderOwnerActionList('blocked', cachedBlocked);
+    }
+    if (typeof cachedAuthorized !== 'undefined' && cachedAuthorized) {
+        renderActionList('authorized', cachedAuthorized);
+        if (typeof renderOwnerActionList === 'function') renderOwnerActionList('authorized', cachedAuthorized);
+    }
+    
     updateTable();
     
     if (typeof updateGraph === 'function') {
@@ -857,8 +967,8 @@ function applyFilters() {
     
     // Also re-render the action lists based on the newly selected parking
     if (typeof fetchAndRenderActionList === 'function') {
-        fetchAndRenderActionList('blocked');
-        fetchAndRenderActionList('authorized');
+        fetchAndRenderActionList('blocked').catch(() => []);
+        fetchAndRenderActionList('authorized').catch(() => []);
     }
     
     setTimeout(() => {
@@ -1020,8 +1130,8 @@ function updateStatistics() {
         };
     }
     
-    const aiCalls = statsCalls.filter(c => c.is_forwarded === 'false');
-    const opCalls = statsCalls.filter(c => c.is_forwarded === 'true');
+    const aiCalls = statsCalls.filter(c => String(c.is_forwarded).toLowerCase() !== 'true' && c.is_forwarded !== true);
+    const opCalls = statsCalls.filter(c => String(c.is_forwarded).toLowerCase() === 'true' || c.is_forwarded === true);
     
     const totalCallsCount = statsCalls.length;
     const aiPercent = totalCallsCount ? Math.round((aiCalls.length / totalCallsCount) * 100) : 0;
@@ -1197,19 +1307,50 @@ function updateStatistics() {
 
 function getParkingNameById(id) {
     if (!id) return id;
-    const select = document.getElementById('parking-selector');
-    if (!select) return id;
-    for (let i = 0; i < select.options.length; i++) {
-        if (select.options[i].value === String(id)) {
-            return select.options[i].text;
+    
+    // First, check the new global DB parking names dictionary
+    if (window.dbParkingNames && window.dbParkingNames[String(id)]) {
+        return window.dbParkingNames[String(id)];
+    }
+    
+    // Second, check sessionStorage
+    const allowedParkingsStr = sessionStorage.getItem('intercom_allowed_parkings');
+    if (allowedParkingsStr) {
+        try {
+            const allowedParkings = JSON.parse(allowedParkingsStr);
+            const matchingParking = allowedParkings.find(p => String(p.id || p) === String(id));
+            if (matchingParking && matchingParking.name && matchingParking.name.trim() !== '') {
+                return matchingParking.name.trim();
+            }
+        } catch(e) {}
+    }
+    
+    // Second, look into the global allCalls array
+    if (typeof allCalls !== 'undefined' && Array.isArray(allCalls)) {
+        const matchingCall = allCalls.find(c => String(c.parking_id) === String(id) && c.parking_name && c.parking_name.trim() !== '');
+        if (matchingCall) {
+            return matchingCall.parking_name.trim();
         }
     }
-    return id;
+    
+    // Third, check the HTML select options inside #parking-selector
+    const select = document.getElementById('parking-selector');
+    if (select) {
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === String(id) && select.options[i].text && select.options[i].text !== String(id)) {
+                return select.options[i].text;
+            }
+        }
+    }
+    
+    // Fallback: raw id string
+    return String(id);
 }
 
 function updateRecentCalls() {
-    const aiCalls = filteredCalls.filter(c => c.is_forwarded === 'false').slice(0, 50);
-    const opCalls = filteredCalls.filter(c => c.is_forwarded === 'true').slice(0, 50);
+    const statsCalls = typeof getStatsCalls === 'function' ? getStatsCalls() : filteredCalls;
+    const aiCalls = statsCalls.filter(c => String(c.is_forwarded).toLowerCase() !== 'true' && c.is_forwarded !== true).slice(0, 50);
+    const opCalls = statsCalls.filter(c => String(c.is_forwarded).toLowerCase() === 'true').slice(0, 50);
     
     const aiList = document.getElementById('recent-ai-list');
     const opList = document.getElementById('recent-op-list');
@@ -1219,22 +1360,22 @@ function updateRecentCalls() {
         aiList.innerHTML = '';
         aiCalls.forEach(c => {
             const date = new Date(c.created_at);
-            const animClass = c.isNew ? 'pulse-green-anim' : '';
+            const animClass = '';
             
-            const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            const dateStr = date.toLocaleDateString('he-IL');
+            const timeStr = date.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = date.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
             
-            let parkingNameStr = '';
-            const laneText = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
-            if (currentParkingId === 'all') {
-                parkingNameStr = `<span style="font-size:0.85rem; color:var(--color-muted-text);">התקשר מ${getParkingNameById(c.parking_id)}${laneText}</span>`;
-            } else {
-                parkingNameStr = c.lane_id ? `<span style="font-size:0.85rem; color:var(--color-muted-text);">התקשר מנתיב ${c.lane_id}</span>` : '';
-            }
-            const req = c.request_summary || '-';
-            const act = c.actions_taken || '-';
-            const blockedRecord = (window.cachedBlocked || []).find(b => String(b.plate).trim() === String(c.plate_number).trim());
-            const authRecord = (window.cachedAuthorized || []).find(a => String(a.plate).trim() === String(c.plate_number).trim());
+            const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
+            const laneStr = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
+            const parkingInfo = ` | חניון: ${parkingName}` + laneStr;
+            
+            let req = c.request_summary || '-';
+            req = req.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            let act = c.actions_taken || '-';
+            act = act.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            const callTime = new Date(c.created_at).getTime();
+            const blockedRecord = (window.cachedBlocked || []).find(b => String(b.plate).trim() === String(c.plate_number).trim() && (!b.parking_id || String(b.parking_id) === 'all' || String(b.parking_id) === String(c.parking_id)) && (!b.added_at || new Date(b.added_at).getTime() <= callTime));
+            const authRecord = (window.cachedAuthorized || []).find(a => String(a.plate).trim() === String(c.plate_number).trim() && (!a.parking_id || String(a.parking_id) === 'all' || String(a.parking_id) === String(c.parking_id)) && (!a.added_at || new Date(a.added_at).getTime() <= callTime));
             
             let dName = c.driver_name || '';
             let dPhone = c.driver_phone || '';
@@ -1261,20 +1402,48 @@ function updateRecentCalls() {
                 typeTag = ` <span style="font-size: 0.8em; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1px 5px; border-radius: 4px; color: var(--text-muted); font-weight: normal; margin-right: 6px; display: inline-block; vertical-align: middle;">${finalType}</span>`;
             }
             let alertHtml = '';
-            if (blockedRecord) {
-                alertHtml = `<div style="margin-top: 6px; color: #ff3b30; font-weight: bold; font-size: 0.9em;">רכב חסום! סיבה: ${blockedRecord.reason || 'ללא סיבה'}</div>`;
+            if (req.includes('רכב חסום')) {
+                let reason = req.replace('רכב חסום:', '').replace('רכב חסום', '').trim() || 'ללא סיבה';
+                alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.9em;">רכב חסום! סיבה: ${reason}</div>`;
+            } else if (req.includes('רכב מורשה')) {
+                let notes = req.replace('רכב מורשה:', '').replace('רכב מורשה', '').trim() || 'ללא סיבה';
+                alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
+            } else if (blockedRecord) {
+                let reason = (blockedRecord.reason || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+                alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.9em;">רכב חסום! סיבה: ${reason}</div>`;
             } else if (authRecord) {
-                alertHtml = `<div style="margin-top: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${authRecord.notes || 'ללא סיבה'})</div>`;
+                let notes = (authRecord.notes || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+                alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
             }
-            const reasonHtml = ` <div style="font-weight: normal; font-size: 0.81em; margin-top: 5px;">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
+            const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
+            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
+                plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
+            }
+            
+            let plateCorrectionCount = 0;
+            const currentCallTime = new Date(c.created_at).getTime();
+            if (c.plate_number && typeof allCalls !== 'undefined') {
+                allCalls.forEach(ac => {
+                    if (String(ac.plate_number).trim() === String(c.plate_number).trim()) {
+                        const acTime = new Date(ac.created_at).getTime();
+                        if (acTime <= currentCallTime) {
+                            if (String(ac.is_plate_corrected).toLowerCase() === 'true' || ac.is_plate_corrected === true) {
+                                plateCorrectionCount++;
+                            }
+                        }
+                    }
+                });
+            }
+            if ((String(c.is_plate_corrected).toLowerCase() === 'true' || c.is_plate_corrected === true) && plateCorrectionCount >= 3) {
+                plateDisplayCard += `<div style="font-size:0.85em;color:var(--accent-red);font-weight:bold;margin-top:2px;">⚠️ מצלמה כשלה בזיהוי ${plateCorrectionCount} פעמים</div>`;
+            }
             
             aiList.innerHTML += `
-                <li class="call-item ${animClass}">
-                    <span class="time">${timeStr} ,${dateStr}</span>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; width: 100%;">
-                        <span class="plate" style="margin: 0; ">רכב: ${c.plate_number || 'לא ידוע'}${typeTag}${driverHtml}${reasonHtml}</span>
-                        <div style="flex: 1; text-align: left;">${parkingNameStr}</div>
-                    </div>
+                <li class="call-item call-item-container ${animClass}">
+                    <div class="call-item-title">רכב: ${plateDisplayCard}${typeTag}${driverHtml}</div>
+                    <div class="call-item-subtitle">${timeStr} | ${dateStr}${parkingInfo}</div>
+                    ${reasonHtml}
                 </li>
             `;
         });
@@ -1288,20 +1457,20 @@ function updateRecentCalls() {
             const hlClass = c.isNew ? 'highlight' : '';
             const animClass = c.isNew ? 'pulse-red-anim' : '';
             
-            const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            const dateStr = date.toLocaleDateString('he-IL');
+            const timeStr = date.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = date.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
             
-            let parkingNameStr = '';
-            const laneText = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
-            if (currentParkingId === 'all') {
-                parkingNameStr = `<span style="font-size:0.85rem; color:var(--color-muted-text);">התקשר מ${getParkingNameById(c.parking_id)}${laneText}</span>`;
-            } else {
-                parkingNameStr = c.lane_id ? `<span style="font-size:0.85rem; color:var(--color-muted-text);">התקשר מנתיב ${c.lane_id}</span>` : '';
-            }
-            const req = c.request_summary || '-';
-            const act = c.actions_taken || '-';
-            const blockedRecord = (window.cachedBlocked || []).find(b => String(b.plate).trim() === String(c.plate_number).trim());
-            const authRecord = (window.cachedAuthorized || []).find(a => String(a.plate).trim() === String(c.plate_number).trim());
+            const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
+            const laneStr = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
+            const parkingInfo = ` | חניון: ${parkingName}` + laneStr;
+            
+            let req = c.request_summary || '-';
+            req = req.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            let act = c.actions_taken || '-';
+            act = act.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            const callTime = new Date(c.created_at).getTime();
+            const blockedRecord = (window.cachedBlocked || []).find(b => String(b.plate).trim() === String(c.plate_number).trim() && (!b.parking_id || String(b.parking_id) === 'all' || String(b.parking_id) === String(c.parking_id)) && (!b.added_at || new Date(b.added_at).getTime() <= callTime));
+            const authRecord = (window.cachedAuthorized || []).find(a => String(a.plate).trim() === String(c.plate_number).trim() && (!a.parking_id || String(a.parking_id) === 'all' || String(a.parking_id) === String(c.parking_id)) && (!a.added_at || new Date(a.added_at).getTime() <= callTime));
             
             let dName = c.driver_name || '';
             let dPhone = c.driver_phone || '';
@@ -1328,20 +1497,48 @@ function updateRecentCalls() {
                 typeTag = ` <span style="font-size: 0.8em; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1px 5px; border-radius: 4px; color: var(--text-muted); font-weight: normal; margin-right: 6px; display: inline-block; vertical-align: middle;">${finalType}</span>`;
             }
             let alertHtml = '';
-            if (blockedRecord) {
-                alertHtml = `<div style="margin-top: 6px; color: #ff3b30; font-weight: bold; font-size: 0.95em;">רכב חסום! סיבה: ${blockedRecord.reason || 'ללא סיבה'}</div>`;
+            if (req.includes('רכב חסום')) {
+                let reason = req.replace('רכב חסום:', '').replace('רכב חסום', '').trim() || 'ללא סיבה';
+                alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.95em;">רכב חסום! סיבה: ${reason}</div>`;
+            } else if (req.includes('רכב מורשה')) {
+                let notes = req.replace('רכב מורשה:', '').replace('רכב מורשה', '').trim() || 'ללא סיבה';
+                alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.95em;">רכב מורשה סיבה (${notes})</div>`;
+            } else if (blockedRecord) {
+                let reason = (blockedRecord.reason || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+                alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.95em;">רכב חסום! סיבה: ${reason}</div>`;
             } else if (authRecord) {
-                alertHtml = `<div style="margin-top: 6px; color: #34c759; font-weight: bold; font-size: 0.95em;">רכב מורשה סיבה (${authRecord.notes || 'ללא סיבה'})</div>`;
+                let notes = (authRecord.notes || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+                alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.95em;">רכב מורשה סיבה (${notes})</div>`;
             }
-            const reasonHtml = ` <div style="font-weight: normal; font-size: 0.99em; margin-top: 5px;">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
+            const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
+            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
+                plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
+            }
+            
+            let plateCorrectionCount = 0;
+            const currentCallTime = new Date(c.created_at).getTime();
+            if (c.plate_number && typeof allCalls !== 'undefined') {
+                allCalls.forEach(ac => {
+                    if (String(ac.plate_number).trim() === String(c.plate_number).trim()) {
+                        const acTime = new Date(ac.created_at).getTime();
+                        if (acTime <= currentCallTime) {
+                            if (String(ac.is_plate_corrected).toLowerCase() === 'true' || ac.is_plate_corrected === true) {
+                                plateCorrectionCount++;
+                            }
+                        }
+                    }
+                });
+            }
+            if ((String(c.is_plate_corrected).toLowerCase() === 'true' || c.is_plate_corrected === true) && plateCorrectionCount >= 3) {
+                plateDisplayCard += `<div style="font-size:0.85em;color:var(--accent-red);font-weight:bold;margin-top:2px;">⚠️ מצלמה כשלה בזיהוי ${plateCorrectionCount} פעמים</div>`;
+            }
             
             opList.innerHTML += `
-                <li class="call-item ${hlClass} ${animClass}">
-                    <span class="time">${timeStr} ,${dateStr}</span>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; width: 100%;">
-                        <span class="plate" style="margin: 0; ">רכב: ${c.plate_number || 'לא ידוע'}${typeTag}${driverHtml}${reasonHtml}</span>
-                        <div style="flex: 1; text-align: left;">${parkingNameStr}</div>
-                    </div>
+                <li class="call-item call-item-container ${hlClass} ${animClass}">
+                    <div class="call-item-title">רכב: ${plateDisplayCard}${typeTag}${driverHtml}</div>
+                    <div class="call-item-subtitle">${timeStr} | ${dateStr}${parkingInfo}</div>
+                    ${reasonHtml}
                 </li>
             `;
         });
@@ -1462,7 +1659,7 @@ function updateTable() {
             
             function parseDDMMYYYY(dateStr) {
                 if (!dateStr || dateStr.length < 8) return null;
-                const parts = dateStr.split('/');
+                const parts = dateStr.split(/[\/\.-]/);
                 if (parts.length === 3) {
                     const d = parseInt(parts[0], 10);
                     const m = parseInt(parts[1], 10) - 1;
@@ -1534,14 +1731,16 @@ let currentCallsToShow = [];
 
 function renderTableRows() {
     const tbody = document.getElementById('calls-table-body');
+    const mobileList = document.getElementById('mobile-calls-list');
     if (!tbody) return;
     tbody.innerHTML = '';
+    if (mobileList) mobileList.innerHTML = '';
     
     const handledBySelect = document.getElementById('search-handled-by');
     const handledByVal = handledBySelect ? handledBySelect.value : '';
 
     currentCallsToShow.forEach(c => {
-        const dateStr = new Date(c.created_at).toLocaleString('he-IL');
+        const dateStr = new Date(c.created_at).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
         let status = '-';
         
         if (handledByVal === '') {
@@ -1554,18 +1753,69 @@ function renderTableRows() {
         
         const tr = document.createElement('tr');
         if (c.isNew) tr.classList.add('new-row-flash');
+        let plateDisplay = c.plate_number || '-';
+        if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
+            plateDisplay += `<br><span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
+        }
+        
+        let plateCorrectionCount = 0;
+        const currentCallTime = new Date(c.created_at).getTime();
+        if (c.plate_number && typeof allCalls !== 'undefined') {
+            allCalls.forEach(ac => {
+                if (String(ac.plate_number).trim() === String(c.plate_number).trim()) {
+                    const acTime = new Date(ac.created_at).getTime();
+                    if (acTime <= currentCallTime) {
+                        if (String(ac.is_plate_corrected).toLowerCase() === 'true' || ac.is_plate_corrected === true) {
+                            plateCorrectionCount++;
+                        }
+                    }
+                }
+            });
+        }
+        
+        if ((String(c.is_plate_corrected).toLowerCase() === 'true' || c.is_plate_corrected === true) && plateCorrectionCount >= 3) {
+            plateDisplay += `<br><span style="font-size:0.85em;color:var(--accent-red);font-weight:bold;">⚠️ מצלמה כשלה בזיהוי ${plateCorrectionCount} פעמים</span>`;
+        }
+        
+        let req = c.request_summary || '-';
+        req = req.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+        let act = c.actions_taken || '-';
+        act = act.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+        
+        const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
+        const laneStr = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
+        const parkingInfo = ` | חניון: ${parkingName}` + laneStr;
+        
+        // Mobile layout mirroring recent-op-list
+        const mobileHtml = `
+            <div class="call-item-title">רכב: ${plateDisplay}</div>
+            <div class="call-item-subtitle">${dateStr} | ${parkingInfo}</div>
+            <div class="call-item-reason">
+                <strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br>
+                <strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span>
+            </div>
+        `;
+        
         tr.innerHTML = `
-            <td>${dateStr}</td>
-            <td>${getParkingNameById(c.parking_id)}</td>
-            <td>${c.lane_id}</td>
-            <td>${c.plate_number}</td>
-            <td>${c.driver_name || '-'}${c.driver_phone ? '<br><span style="font-size:0.85em;color:gray;">' + c.driver_phone + '</span>' : ''}</td>
-            <td>${c.call_duration}s</td>
-            <td>${c.request_summary || '-'}</td>
-            <td>${c.actions_taken || '-'}</td>
-            <td>${status}</td>
+            <td class="desktop-td">${dateStr}</td>
+            <td class="desktop-td">${parkingName}</td>
+            <td class="desktop-td">${c.lane_id}</td>
+            <td class="desktop-td" style="direction: ltr; text-align: right;">${plateDisplay}</td>
+            <td class="desktop-td">${c.driver_name || '-'}${c.driver_phone ? '<br><span style="font-size:0.85em;color:gray;">' + c.driver_phone + '</span>' : ''}</td>
+            <td class="desktop-td">${c.call_duration}s</td>
+            <td class="desktop-td">${c.request_summary || '-'}</td>
+            <td class="desktop-td">${c.actions_taken || '-'}</td>
+            <td class="desktop-td">${status}</td>
         `;
         tbody.appendChild(tr);
+
+        if (mobileList) {
+            const li = document.createElement('li');
+            li.className = 'call-item call-item-container';
+            if (c.isNew) li.classList.add('new-row-flash');
+            li.innerHTML = mobileHtml;
+            mobileList.appendChild(li);
+        }
     });
     
     // Remove old load more container if it exists
@@ -1705,6 +1955,26 @@ function updatePopularTimesInfo(hour, count, maxCalls) {
     infoIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>`;
 }
 
+window.currentGraphType = window.currentGraphType || 'bar';
+window.setGraphType = function(type) {
+    window.currentGraphType = type;
+    
+    // Update active button styling if buttons exist (index/owner_dashboard)
+    const btnBar = document.getElementById('btn-graph-type-bar');
+    const btnLine = document.getElementById('btn-graph-type-line');
+    if (btnBar && btnLine) {
+        btnBar.style.background = type === 'bar' ? 'var(--bg-panel)' : 'transparent';
+        btnBar.style.color = type === 'bar' ? 'var(--text-color)' : 'var(--text-muted)';
+        btnBar.style.border = type === 'bar' ? '1px solid var(--border-color)' : '1px solid transparent';
+        
+        btnLine.style.background = type === 'line' ? 'var(--bg-panel)' : 'transparent';
+        btnLine.style.color = type === 'line' ? 'var(--text-color)' : 'var(--text-muted)';
+        btnLine.style.border = type === 'line' ? '1px solid var(--border-color)' : '1px solid transparent';
+    }
+    
+    updateGraph();
+};
+
 function updateGraph() {
     const timeframe = document.getElementById('graph-timeframe').value; // 24h, 7d, 30d
     const container = document.getElementById('bar-chart-container');
@@ -1810,7 +2080,7 @@ function updateGraph() {
         if (startVal && endVal) {
             function parseDDMMYYYY(dateStr) {
                 if (!dateStr || dateStr.length < 8) return null;
-                const parts = dateStr.split('/');
+                const parts = dateStr.split(/[\/\.-]/);
                 if (parts.length === 3) {
                     const d = parseInt(parts[0], 10);
                     const m = parseInt(parts[1], 10) - 1;
@@ -1861,14 +2131,17 @@ function updateGraph() {
     // Find max value to scale heights
     const maxCount = Math.max(...Object.values(buckets).map(b => b.ai + b.op), 1);
     
-    // Draw bars
-    orderedLabels.forEach(label => {
+    // Draw bars or lines
+    const isLine = window.currentGraphType === 'line';
+    
+    orderedLabels.forEach((label, i) => {
         const counts = buckets[label];
         const total = counts.ai + counts.op;
         const totalHeightPercent = (total / maxCount) * 100;
         
         const wrapper = document.createElement('div');
         wrapper.className = 'chart-bar-wrapper';
+        wrapper.style.position = 'relative'; // important for SVG absolute positioning
         
         const tooltip = document.createElement('div');
         tooltip.className = 'chart-tooltip';
@@ -1876,21 +2149,112 @@ function updateGraph() {
         
         const bar = document.createElement('div');
         bar.className = 'chart-bar';
-        bar.style.height = `${totalHeightPercent}%`;
-        bar.style.display = 'flex';
-        bar.style.flexDirection = 'column-reverse'; // Stack from bottom
-        bar.style.background = 'transparent'; // Remove default bg
-        bar.style.overflow = 'hidden'; // Keep border radius clean
         
-        if (total > 0) {
-            const aiPercent = (counts.ai / total) * 100;
-            const opPercent = (counts.op / total) * 100;
+        if (isLine) {
+            bar.style.height = '100%';
+            bar.style.width = '100%';
+            bar.style.background = 'transparent'; // Invisible hit area for hover
             
-            // Bottom bar is AI, top is Operator
-            bar.innerHTML = `
-                <div style="height: ${aiPercent}%; width: 100%; background-color: var(--accent-green);"></div>
-                <div style="height: ${opPercent}%; width: 100%; background-color: var(--accent-blue);"></div>
-            `;
+            if (total > 0) {
+                const aiYPercent = 100 - ((counts.ai / maxCount) * 100);
+                const opYPercent = 100 - ((counts.op / maxCount) * 100);
+                
+                const dotContainer = document.createElement('div');
+                dotContainer.style.position = 'absolute';
+                dotContainer.style.left = '0';
+                dotContainer.style.top = '0';
+                dotContainer.style.width = '100%';
+                dotContainer.style.height = '100%'; // Full height, the flex alignment places this at bottom with labels
+                dotContainer.style.pointerEvents = 'none';
+                
+                if (counts.ai > 0) {
+                    const aiDot = document.createElement('div');
+                    aiDot.style.position = 'absolute';
+                    aiDot.style.left = '50%';
+                    aiDot.style.top = `${aiYPercent}%`;
+                    aiDot.style.transform = 'translate(-50%, -50%)';
+                    aiDot.style.width = '8px';
+                    aiDot.style.height = '8px';
+                    aiDot.style.backgroundColor = 'var(--bg-panel)';
+                    aiDot.style.border = '2px solid var(--accent-green)';
+                    aiDot.style.borderRadius = '50%';
+                    aiDot.style.zIndex = '2';
+                    dotContainer.appendChild(aiDot);
+                }
+                
+                if (counts.op > 0) {
+                    const opDot = document.createElement('div');
+                    opDot.style.position = 'absolute';
+                    opDot.style.left = '50%';
+                    opDot.style.top = `${opYPercent}%`;
+                    opDot.style.transform = 'translate(-50%, -50%)';
+                    opDot.style.width = '8px';
+                    opDot.style.height = '8px';
+                    opDot.style.backgroundColor = 'var(--bg-panel)';
+                    opDot.style.border = '2px solid var(--accent-blue)';
+                    opDot.style.borderRadius = '50%';
+                    opDot.style.zIndex = '2';
+                    dotContainer.appendChild(opDot);
+                }
+                
+                // Draw connecting lines to the next column
+                if (i < orderedLabels.length - 1) {
+                    const nextCounts = buckets[orderedLabels[i+1]];
+                    const nextAiYPercent = 100 - ((nextCounts.ai / maxCount) * 100);
+                    const nextOpYPercent = 100 - ((nextCounts.op / maxCount) * 100);
+                    
+                    const svgNS = "http://www.w3.org/2000/svg";
+                    const svg = document.createElementNS(svgNS, "svg");
+                    svg.style.position = 'absolute';
+                    svg.style.left = '50%';
+                    svg.style.top = '0';
+                    // The line goes from the center of this column to the center of the next column
+                    // Width = 100% of this column + 10px gap
+                    svg.style.width = 'calc(100% + 10px)'; 
+                    svg.style.height = '100%';
+                    svg.style.overflow = 'visible';
+                    svg.style.zIndex = '1';
+                    
+                    const aiLine = document.createElementNS(svgNS, "line");
+                    aiLine.setAttribute("x1", "0%");
+                    aiLine.setAttribute("y1", `${aiYPercent}%`);
+                    aiLine.setAttribute("x2", "100%");
+                    aiLine.setAttribute("y2", `${nextAiYPercent}%`);
+                    aiLine.setAttribute("stroke", "var(--accent-green)");
+                    aiLine.setAttribute("stroke-width", "3");
+                    svg.appendChild(aiLine);
+                    
+                    const opLine = document.createElementNS(svgNS, "line");
+                    opLine.setAttribute("x1", "0%");
+                    opLine.setAttribute("y1", `${opYPercent}%`);
+                    opLine.setAttribute("x2", "100%");
+                    opLine.setAttribute("y2", `${nextOpYPercent}%`);
+                    opLine.setAttribute("stroke", "var(--accent-blue)");
+                    opLine.setAttribute("stroke-width", "3");
+                    svg.appendChild(opLine);
+                    
+                    dotContainer.appendChild(svg);
+                }
+                
+                bar.appendChild(dotContainer);
+            }
+        } else {
+            bar.style.height = `${totalHeightPercent}%`;
+            bar.style.display = 'flex';
+            bar.style.flexDirection = 'column-reverse'; // Stack from bottom
+            bar.style.background = 'transparent'; // Remove default bg
+            bar.style.overflow = 'hidden'; // Keep border radius clean
+            
+            if (total > 0) {
+                const aiPercent = (counts.ai / total) * 100;
+                const opPercent = (counts.op / total) * 100;
+                
+                // Bottom bar is AI, top is Operator
+                bar.innerHTML = `
+                    <div style="height: ${aiPercent}%; width: 100%; background-color: var(--accent-green);"></div>
+                    <div style="height: ${opPercent}%; width: 100%; background-color: var(--accent-blue);"></div>
+                `;
+            }
         }
         
         const labelEl = document.createElement('div');
@@ -1991,19 +2355,65 @@ tabButtons.forEach(btn => {
     });
 });
 
-setInterval(() => {
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab) {
-        const targetId = activeTab.getAttribute('data-target');
-        if (targetId === 'tab-blocked') fetchAndRenderActionList('blocked');
-        if (targetId === 'tab-authorized') fetchAndRenderActionList('authorized');
-    }
-}, 3000);
+let globalPollingInterval = null;
+window.isListInteractionActive = false;
+
+function startGlobalPolling() {
+    if (globalPollingInterval) clearInterval(globalPollingInterval);
+    
+    globalPollingInterval = setInterval(() => {
+        // 2. HOVER & SCROLL GUARD
+        if (window.isListInteractionActive) return; // Skip entire polling tick silently
+        
+        // 3. MOKED PAGE - FREEZE ON TABS
+        if (!document.getElementById('owner-dashboard-marker') && !document.getElementById('admin-dashboard-marker')) {
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab) {
+                const targetId = activeTab.getAttribute('data-target');
+                if (targetId === 'tab-blocked' || targetId === 'tab-authorized') {
+                    return; // Pause completely
+                }
+            }
+        }
+        
+        // Call all polling functions
+        if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
+        if (typeof pollOperatorCallsFast === 'function') pollOperatorCallsFast().catch(e => console.error(e));
+    }, 60000); // SINGLE 60s TIMER
+}
+
+window.scrollGuardTimeout = null;
+
+function attachGlobalGuards(container) {
+    if (!container || container.dataset.guardAttached) return;
+    container.dataset.guardAttached = 'true';
+    
+    container.addEventListener('mouseenter', () => { window.isListInteractionActive = true; });
+    container.addEventListener('mouseleave', () => { window.isListInteractionActive = false; });
+    
+    container.addEventListener('scroll', () => {
+        window.isListInteractionActive = true;
+        if (window.scrollGuardTimeout) clearTimeout(window.scrollGuardTimeout);
+        window.scrollGuardTimeout = setTimeout(() => {
+            window.isListInteractionActive = false;
+        }, 1500);
+    }, { passive: true });
+}
+
+function setupGlobalListGuards() {
+    // Find all list containers and table wrappers across all dashboards
+    const containers = document.querySelectorAll('.action-list, .table-wrapper, .scroll-container, #owner-blocked-list, #owner-authorized-list, #blocked-list, #authorized-list, #op-calls-list, #ai-calls-list');
+    containers.forEach(el => {
+        const container = (el.tagName === 'UL' || el.tagName === 'TABLE') && el.parentElement ? el.parentElement : el;
+        attachGlobalGuards(container);
+    });
+}
 
 let cachedBlocked = [];
 let cachedAuthorized = [];
 
 async function fetchAndRenderActionList(type) {
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/${type}?v=` + Date.now());
         let data = await response.json();
@@ -2023,6 +2433,8 @@ async function fetchAndRenderActionList(type) {
         renderOwnerActionList(type, data); // For manager dashboard
     } catch (err) {
         console.error(`Error fetching ${type} list:`, err);
+        // Do NOT wipe the existing list or render "אין רכבים להציג" if a polling response is loading or temporarily empty.
+        // Keep existing DOM row items intact during polling failures!
     }
 }
 
@@ -2030,6 +2442,7 @@ function renderActionList(type, data) {
     const listEl = document.getElementById(`${type}-list`);
     const searchInput = document.getElementById(`search-${type}`);
     if (!listEl) return;
+    // Guard checks are now handled globally in startGlobalPolling and setupGlobalListGuards
     
     let filteredData = data;
     if (searchInput && searchInput.value) {
@@ -2039,9 +2452,56 @@ function renderActionList(type, data) {
     
     filteredData.sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
     
-    listEl.innerHTML = '';
-    filteredData.forEach(item => {
+    // Prevent DOM redraw if data hasn't changed (prevents scroll jumps)
+    const dataHash = JSON.stringify(filteredData);
+    if (listEl.dataset.lastRender === dataHash) {
+        return; // Nothing changed
+    }
+    
+    const scrollContainer = listEl.parentElement;
+    const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    
+    // RULE 2: ONLY REFRESH WHEN AT TOP OF PAGE
+    if (previousScrollTop > 0) {
+        return; // SKIP the DOM update completely until the next cycle when they return to the top
+    }
+    
+    listEl.dataset.lastRender = dataHash;
+    
+    if (filteredData.length === 0) {
+        listEl.innerHTML = '<li style="text-align:center; padding:10px; color:var(--text-muted);">אין רכבים מוגדרים</li>';
+        return;
+    }
+    
+    // Remove "no items" message if present
+    if (listEl.children.length === 1 && listEl.children[0].innerText.includes('אין רכבים')) {
+        listEl.innerHTML = '';
+    }
+    
+    filteredData.forEach((item, i) => {
+        const itemKey = item.plate + '_' + item.added_at;
+        
+        let existingNode = null;
+        if (i < listEl.children.length && listEl.children[i].dataset.key === itemKey) {
+            existingNode = listEl.children[i];
+        } else {
+            for (let j = i; j < listEl.children.length; j++) {
+                if (listEl.children[j].dataset.key === itemKey) {
+                    existingNode = listEl.children[j];
+                    break;
+                }
+            }
+        }
+        
+        if (existingNode) {
+            if (listEl.children[i] !== existingNode) {
+                listEl.insertBefore(existingNode, listEl.children[i]);
+            }
+            return; // Node exists and is correctly positioned
+        }
+
         const li = document.createElement('li');
+        li.dataset.key = itemKey;
         if (type === 'blocked') {
             li.style.background = 'rgba(255, 69, 58, 0.15)';
             li.style.border = '1px solid rgba(255, 69, 58, 0.3)';
@@ -2057,35 +2517,41 @@ function renderActionList(type, data) {
         li.style.justifyContent = 'space-between';
         li.style.alignItems = 'center';
         
-        // Right side: Plate & Driver Name
         const rightDiv = document.createElement('div');
         rightDiv.style.flex = '1';
         rightDiv.style.textAlign = 'right';
         const driverNameStr = item.driver_name ? ` - ${item.driver_name}${item.driver_phone ? ' (' + item.driver_phone + ')' : ''}` : (item.driver_phone ? ` - ${item.driver_phone}` : '');
-        const parkingName = getParkingNameById(item.parking_id) || 'כללי';
+        const parkingName = item.parking_name || getParkingNameById(item.parking_id) || 'כללי';
         rightDiv.innerHTML = `<strong>רכב: ${item.plate}</strong><span style="font-weight: normal; opacity: 0.9;">${driverNameStr}</span><div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 3px;">${parkingName}</div>`;
         
-        // Middle side: Reason
         const middleDiv = document.createElement('div');
         middleDiv.style.flex = '1';
         middleDiv.style.textAlign = 'center';
         const reasonText = item.reason || item.action || '';
         middleDiv.innerHTML = `<span style="opacity: 0.8; font-size: 0.9rem;">${reasonText}</span>`;
         
-        // Left side: Date & Time
         const leftDiv = document.createElement('div');
         leftDiv.style.flex = '1';
         leftDiv.style.textAlign = 'left';
         const dateObj = new Date(item.added_at);
-        const dateStr = dateObj.toLocaleDateString('he-IL');
-        const timeStr = dateObj.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const dateStr = dateObj.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+        const timeStr = dateObj.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         leftDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted);">${timeStr} ${dateStr}</span>`;
         
         li.appendChild(rightDiv);
         li.appendChild(middleDiv);
         li.appendChild(leftDiv);
-        listEl.appendChild(li);
+        
+        if (i < listEl.children.length) {
+            listEl.insertBefore(li, listEl.children[i]);
+        } else {
+            listEl.appendChild(li);
+        }
     });
+    
+    while (listEl.children.length > filteredData.length) {
+        listEl.removeChild(listEl.lastChild);
+    }
 }
 
 // ----------------------------------------------------
@@ -2095,17 +2561,61 @@ function renderOwnerActionList(type, data) {
     const listEl = document.getElementById(`owner-${type}-list`);
     if (!listEl) return;
     
+    attachGlobalGuards(listEl.parentElement);
+    
     // Sort descending by date
     let sortedData = [...data].sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
     
-    listEl.innerHTML = '';
+    // Prevent DOM redraw if data hasn't changed
+    const dataHash = JSON.stringify(sortedData);
+    if (listEl.dataset.lastRender === dataHash) {
+        return;
+    }
+    
+    const scrollContainer = listEl.parentElement;
+    const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    
+    // RULE 2: ONLY REFRESH WHEN AT TOP OF PAGE
+    if (previousScrollTop > 0) {
+        return; // SKIP the DOM update completely until the next cycle when they return to the top
+    }
+    
+    listEl.dataset.lastRender = dataHash;
+    
     if (sortedData.length === 0) {
         listEl.innerHTML = '<li style="text-align:center; padding:10px; color:var(--text-muted);">אין רכבים מוגדרים</li>';
         return;
     }
     
-    sortedData.forEach(item => {
+    // Remove "no items" message if present
+    if (listEl.children.length === 1 && listEl.children[0].innerText.includes('אין רכבים')) {
+        listEl.innerHTML = '';
+    }
+    
+    sortedData.forEach((item, i) => {
+        const itemKey = item.plate + '_' + item.added_at;
+        
+        let existingNode = null;
+        if (i < listEl.children.length && listEl.children[i].dataset.key === itemKey) {
+            existingNode = listEl.children[i];
+        } else {
+            for (let j = i; j < listEl.children.length; j++) {
+                if (listEl.children[j].dataset.key === itemKey) {
+                    existingNode = listEl.children[j];
+                    break;
+                }
+            }
+        }
+        
+        if (existingNode) {
+            if (listEl.children[i] !== existingNode) {
+                listEl.insertBefore(existingNode, listEl.children[i]);
+            }
+            return; // Node exists and is correctly positioned
+        }
+
         const li = document.createElement('li');
+        li.dataset.key = itemKey;
         li.style.background = 'var(--bg-panel)';
         li.style.padding = '12px';
         li.style.borderRadius = '8px';
@@ -2118,18 +2628,99 @@ function renderOwnerActionList(type, data) {
         infoDiv.style.display = 'flex';
         infoDiv.style.flexDirection = 'column';
         infoDiv.style.gap = '4px';
+        infoDiv.style.flex = '1';
         
-        const parkingName = getParkingNameById(item.parking_id) || 'כללי';
+        const parkingName = item.parking_name || getParkingNameById(item.parking_id) || 'כללי';
         const dateObj = new Date(item.added_at);
-        const dateStr = dateObj.toLocaleDateString('he-IL') + ' ' + dateObj.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' }) + ' ' + dateObj.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         
         let detailsStr = `<strong>רכב: ${item.plate}</strong> | ${parkingName}`;
         if (item.driver_name || item.driver_phone) detailsStr += ` | נהג: ${item.driver_name || ''} ${item.driver_phone || ''}`.trim();
         
-        let notesStr = item.reason || item.action || '';
+        let notesStr = item.reason || item.action || item.notes || '';
+        notesStr = notesStr.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
         if (notesStr) notesStr = `<span style="font-size: 0.85rem; color: var(--text-muted);">הערה: ${notesStr}</span>`;
         
+        let plateCorrectionCount = 0;
+        if (item.plate && typeof allCalls !== 'undefined') {
+            allCalls.forEach(c => {
+                if (String(c.plate_number).trim() === String(item.plate).trim()) {
+                    if (String(c.is_plate_corrected).toLowerCase() === 'true' || c.is_plate_corrected === true) {
+                        plateCorrectionCount++;
+                    }
+                }
+            });
+        }
+        
+        if (plateCorrectionCount >= 2) {
+            notesStr += `<br><span style="font-size:0.85em;color:var(--accent-red);font-weight:bold;">⚠️ מצלמה כשלה בזיהוי ${plateCorrectionCount} פעמים</span>`;
+        }
+        
+        let extraTimesStr = '';
+        let dynamicEntry = null;
+        let dynamicEntryLane = '';
+        let dynamicExit = null;
+        let dynamicExitLane = '';
+        
+        if (typeof allCalls !== 'undefined') {
+            allCalls.forEach(c => {
+                if (String(c.plate_number).trim() === String(item.plate).trim()) {
+                    if (!item.parking_id || String(item.parking_id) === 'all' || String(item.parking_id) === String(c.parking_id)) {
+                        const cTime = new Date(c.created_at).getTime();
+                        const laneStr = String(c.lane_id || '');
+                        const actStr = String(c.actions_taken || '');
+                        const reqStr = String(c.request_summary || '');
+                        
+                        const isEntry = laneStr.startsWith('1') || actStr.includes('כניסה') || reqStr.includes('כניסה');
+                        const isExit = laneStr.startsWith('2') || actStr.includes('יציאה') || reqStr.includes('יציאה');
+                        
+                        if (isEntry && (!dynamicEntry || cTime > dynamicEntry)) {
+                            dynamicEntry = cTime;
+                            dynamicEntryLane = laneStr;
+                        }
+                        if (isExit && (!dynamicExit || cTime > dynamicExit)) {
+                            dynamicExit = cTime;
+                            dynamicExitLane = laneStr;
+                        }
+                    }
+                }
+            });
+        }
+        
+        let finalEntry = item.entry_time ? new Date(item.entry_time).getTime() : (item.entry_attempt ? new Date(item.entry_attempt).getTime() : 0);
+        let finalExit = item.exit_time ? new Date(item.exit_time).getTime() : 0;
+        
+        if (dynamicEntry > finalEntry) finalEntry = dynamicEntry;
+        if (dynamicExit > finalExit) finalExit = dynamicExit;
+
+        extraTimesStr += `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; font-size: 0.75rem; min-height: 18px;">`;
+        
+        extraTimesStr += `<div style="flex: 1;"></div>`; // Right spacer
+        
+        if (finalEntry > 0) {
+            const et = new Date(finalEntry);
+            const lText = (finalEntry === dynamicEntry && dynamicEntryLane) ? ` (${dynamicEntryLane})` : '';
+            const dStr = et.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            const tStr = et.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit' });
+            extraTimesStr += `<div style="flex: 1; text-align: center; color: #FFFFFF; white-space: nowrap; cursor: pointer;" onclick="searchCallForVehicle('${item.plate}', '${dStr}', '${tStr}')" title="לחץ לחיפוש השיחה">כניסה אחרונה${lText}: ${tStr} ${dStr}</div>`;
+        } else {
+            extraTimesStr += `<div style="flex: 1;"></div>`;
+        }
+        
+        if (finalExit > 0) {
+            const ex = new Date(finalExit);
+            const lText = (finalExit === dynamicExit && dynamicExitLane) ? ` (${dynamicExitLane})` : '';
+            const dStr = ex.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            const tStr = ex.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit' });
+            extraTimesStr += `<div style="flex: 1; text-align: left; color: #FFFFFF; white-space: nowrap; cursor: pointer;" onclick="searchCallForVehicle('${item.plate}', '${dStr}', '${tStr}')" title="לחץ לחיפוש השיחה">יציאה אחרונה${lText}: ${tStr} ${dStr}</div>`;
+        } else {
+            extraTimesStr += `<div style="flex: 1;"></div>`;
+        }
+        
+        extraTimesStr += `</div>`;
+        
         infoDiv.innerHTML = `
+            ${extraTimesStr}
             <span>${detailsStr}</span>
             ${notesStr}
             <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">נוסף ב- ${dateStr}</span>
@@ -2146,9 +2737,9 @@ function renderOwnerActionList(type, data) {
                 await fetch(`${API_BASE_URL}/api/${type}/remove`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ plate_number: item.plate })
+                    body: JSON.stringify({ plate_number: item.plate, parking_id: item.parking_id })
                 });
-                fetchAndRenderActionList(type); // Re-fetch
+                fetchAndRenderActionList(type).catch(() => []); // Re-fetch
             }
         };
         
@@ -2156,8 +2747,24 @@ function renderOwnerActionList(type, data) {
         
         li.appendChild(infoDiv);
         li.appendChild(actionDiv);
-        listEl.appendChild(li);
+        
+        if (i < listEl.children.length) {
+            listEl.insertBefore(li, listEl.children[i]);
+        } else {
+            listEl.appendChild(li);
+        }
     });
+    
+    while (listEl.children.length > sortedData.length) {
+        listEl.removeChild(listEl.lastChild);
+    }
+    
+    if (scrollContainer && previousScrollTop > 0) {
+        requestAnimationFrame(() => {
+            scrollContainer.scrollTop = previousScrollTop;
+            scrollContainer.style.minHeight = '';
+        });
+    }
 }
 
 function setupOwnerListForms() {
@@ -2170,15 +2777,6 @@ function setupOwnerListForms() {
                 const payload = Object.fromEntries(formData.entries());
                 
                 const loggedUser = localStorage.getItem('intercom_remember_user') || '';
-                if (loggedUser) {
-                    if (payload.notes !== undefined) {
-                        payload.notes = payload.notes ? payload.notes + ` (בוצע ע"י: ${loggedUser})` : `(בוצע ע"י: ${loggedUser})`;
-                    } else if (payload.reason !== undefined) {
-                        payload.reason = payload.reason ? payload.reason + ` (בוצע ע"י: ${loggedUser})` : `(בוצע ע"י: ${loggedUser})`;
-                    } else {
-                        payload.notes = `(בוצע ע"י: ${loggedUser})`;
-                    }
-                }
                 
                 try {
                     const res = await fetch(`${API_BASE_URL}/api/${type}/add`, {
@@ -2189,7 +2787,7 @@ function setupOwnerListForms() {
                     
                     if (res.ok) {
                         form.reset();
-                        fetchAndRenderActionList(type);
+                        fetchAndRenderActionList(type).catch(() => []);
                     } else {
                         const err = await res.text();
                         alert("שגיאה בהוספה: " + err);
@@ -2435,8 +3033,8 @@ window.renderAICostList = function(callsList) {
     filteredList.forEach(item => {
         const c = item.call;
         const d = new Date(c.created_at);
-        const timeStr = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-        const dateStr = d.toLocaleDateString('he-IL');
+        const timeStr = d.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = d.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
         
         let statusHtml = '';
         if (item.isForwarded) {
@@ -2456,12 +3054,45 @@ window.renderAICostList = function(callsList) {
         const plate = c.plate_number || 'לא ידוע';
         const flashClass = c.isNew ? 'new-row-flash' : '';
         
+        const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
+        const laneStr = c.lane_id ? ` | נתיב: ${c.lane_id}` : '';
+        let act = c.actions_taken || '-';
+        act = act.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+        
+        const callTime = new Date(c.created_at).getTime();
+        const blockedRecord = (window.cachedBlocked || []).find(b => String(b.plate).trim() === String(c.plate_number).trim() && (!b.parking_id || String(b.parking_id) === 'all' || String(b.parking_id) === String(c.parking_id)) && (!b.added_at || new Date(b.added_at).getTime() <= callTime));
+        const authRecord = (window.cachedAuthorized || []).find(a => String(a.plate).trim() === String(c.plate_number).trim() && (!a.parking_id || String(a.parking_id) === 'all' || String(a.parking_id) === String(c.parking_id)) && (!a.added_at || new Date(a.added_at).getTime() <= callTime));
+        
+        let req = c.request_summary || '-';
+        req = req.replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+        
+        let alertHtml = '';
+        if (req.includes('רכב חסום')) {
+            let reason = req.replace('רכב חסום:', '').replace('רכב חסום', '').trim() || 'ללא סיבה';
+            alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.9em;">רכב חסום! סיבה: ${reason}</div>`;
+        } else if (req.includes('רכב מורשה')) {
+            let notes = req.replace('רכב מורשה:', '').replace('רכב מורשה', '').trim() || 'ללא סיבה';
+            alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
+        } else if (blockedRecord) {
+            let reason = (blockedRecord.reason || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            alertHtml = `<div style="margin-bottom: 6px; color: #ff3b30; font-weight: bold; font-size: 0.9em;">רכב חסום! סיבה: ${reason}</div>`;
+        } else if (authRecord) {
+            let notes = (authRecord.notes || 'ללא סיבה').replace(/\s*\(בוצע ע["'״]?י:.*?\)/g, '');
+            alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
+        }
+        
+        let plateDisplayCard = plate;
+        if (c.repaired_plate && c.repaired_plate !== plate) {
+            plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
+        }
+        
         htmlContent += `
-            <li class="${flashClass}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 1px solid var(--border-color);">
-                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                    <span style="font-weight: bold; font-size: 1rem;">רכב: ${plate}</span>
-                    <span style="font-size: 0.8rem; color: var(--color-muted-text) !important;">${timeStr} | ${dateStr}</span>
-                    <span style="font-size: 0.76rem; margin-top: 4px; display: block; line-height: 1.4;"><strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${c.request_summary || '-'}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${c.actions_taken || '-'}</span></span>
+            <li class="${flashClass}" style="padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 1px solid var(--border-color); text-align: right; display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                    <div style="font-weight: bold; font-size: 1rem; margin-bottom: 4px;">רכב: ${plateDisplayCard}</div>
+                    <div style="font-size: 0.8rem; color: var(--color-muted-text) !important; margin-bottom: 4px;">${timeStr} | ${dateStr} | חניון: ${parkingName}${laneStr}</div>
+                    ${alertHtml}
+                    <div style="font-size: 0.76rem; margin-top: 4px; line-height: 1.4;"><strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>
                 </div>
                 <div style="flex-shrink: 0; margin-right: 15px;">${statusHtml}</div>
             </li>
@@ -2623,7 +3254,9 @@ document.getElementById('search-authorized')?.addEventListener('input', () => {
 // Auto-start dashboard
 if (document.getElementById('owner-dashboard-marker')) {
     initDashboard();
-} else if (!document.getElementById('admin-dashboard-marker')) {
+} else if (document.getElementById('admin-dashboard-marker')) {
+    fetchParkingNames().catch(e => console.warn(e)); // Ensure parking names are loaded for admin tables
+} else {
     if (sessionStorage.getItem('intercom_session_token')) {
         showScreen('dashboard-screen');
         initDashboard();
@@ -2646,38 +3279,45 @@ setInterval(() => {
         }
     }
 
-    let roleNavContainer = document.getElementById('role-nav-buttons');
-    if (roleNavContainer && (role === 'owner' || role === 'manager' || role === 'admin')) {
-        roleNavContainer.style.display = 'flex';
-        roleNavContainer.style.background = 'rgba(0,0,0,0.2)';
-        roleNavContainer.style.padding = '4px 8px';
-        roleNavContainer.style.borderRadius = '8px';
-        roleNavContainer.style.border = '1px solid rgba(255,255,255,0.1)';
+    let roleNavContainers = document.querySelectorAll('.role-nav-buttons, #role-nav-buttons');
+    if (roleNavContainers.length > 0 && (role === 'owner' || role === 'manager' || role === 'admin')) {
+        roleNavContainers.forEach(container => {
+            container.style.display = 'flex';
+            container.style.background = 'rgba(0,0,0,0.2)';
+            container.style.padding = '4px 8px';
+            container.style.borderRadius = '8px';
+            container.style.border = '1px solid rgba(255,255,255,0.1)';
+        });
         
         const isOwner = path.includes('owner_dashboard');
         const isAdmin = path.includes('admin_dashboard');
         const isOperator = (!isOwner && !isAdmin);
 
-        const btnAdmin = document.getElementById('nav-admin-btn');
-        const btnManager = document.getElementById('nav-manager-btn');
-        const btnOperator = document.getElementById('nav-operator-btn');
+        const btnAdmins = document.querySelectorAll('.nav-admin-btn, #nav-admin-btn');
+        const btnManagers = document.querySelectorAll('.nav-manager-btn, #nav-manager-btn');
+        const btnOperators = document.querySelectorAll('.nav-operator-btn, #nav-operator-btn');
 
-        if (btnAdmin) {
+        btnAdmins.forEach(btnAdmin => {
             if (role === 'admin') {
                 btnAdmin.style.display = 'inline-block';
+                btnAdmin.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); window.location.href = 'admin_dashboard.html'; });
             }
             if (isAdmin) btnAdmin.classList.add('active');
-        }
-        if (btnManager) {
+        });
+        btnManagers.forEach(btnManager => {
             if (role === 'admin' || role === 'manager' || role === 'owner') {
                 btnManager.style.display = 'inline-block';
+                btnManager.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); window.location.href = 'owner_dashboard.html'; });
             }
             if (isOwner) btnManager.classList.add('active');
-        }
-        if (btnOperator) {
-            btnOperator.style.display = 'inline-block';
+        });
+        btnOperators.forEach(btnOperator => {
+            if (role === 'admin' || role === 'manager' || role === 'owner') {
+                btnOperator.style.display = 'inline-block';
+                btnOperator.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); window.location.href = 'index.html'; });
+            }
             if (isOperator) btnOperator.classList.add('active');
-        }
+        });
     }
 }, 1000);
 
@@ -2987,7 +3627,23 @@ function switchMobileView(viewClass, btnText) {
     // Update the button text if provided
     if (btnText) {
         const btnSpan = document.getElementById('mobile-dropdown-current');
-        if (btnSpan) btnSpan.textContent = btnText;
+        if (btnSpan) {
+            let displayTxt = btnText;
+            try {
+                if (typeof getParkingNameById === 'function') {
+                    const resolved = getParkingNameById(btnText);
+                    if (resolved && resolved !== 'כללי') {
+                        displayTxt = resolved;
+                    }
+                }
+            } catch(e) {}
+            btnSpan.textContent = displayTxt;
+        }
+    }
+    
+    // Refresh items within .mobile-dropdown-menu to show dynamic names
+    if (typeof refreshMobileDropdownNames === 'function') {
+        refreshMobileDropdownNames();
     }
     
     // Close the dropdown
@@ -3011,6 +3667,11 @@ function switchMobileView(viewClass, btnText) {
         if (barChartWrapper) {
             barChartWrapper.scrollLeft = -99999;
             if (barChartWrapper.scrollLeft === 0) barChartWrapper.scrollLeft = 99999;
+        }
+        
+        // Explicitly trigger applyFilters() to re-render dynamic text contents instantly and bypass cache
+        if (typeof applyFilters === 'function') {
+            applyFilters();
         }
     }, 50);
 }
@@ -3046,6 +3707,28 @@ function injectMobileTitles() {
 }
 if(document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', injectMobileTitles); } else { injectMobileTitles(); }
 
+function refreshMobileDropdownNames() {
+    document.querySelectorAll('.mobile-dropdown-menu .mobile-dropdown-item').forEach(item => {
+        const titleSpan = item.querySelector('.mobile-dropdown-item-title');
+        if (titleSpan) {
+            const onclickAttr = item.getAttribute('onclick') || '';
+            const match = onclickAttr.match(/switchMobileView\('[^']*',\s*'([^']+)'\)/);
+            if (match && match[1]) {
+                const originalId = match[1];
+                let resolvedName = originalId;
+                try {
+                    if (typeof getParkingNameById === 'function') {
+                        const resolved = getParkingNameById(originalId);
+                        if (resolved && resolved !== 'כללי') {
+                            resolvedName = resolved;
+                        }
+                    }
+                } catch(e) {}
+                titleSpan.textContent = resolvedName;
+            }
+        }
+    });
+}
 
 function updateLanesList() {
     const lanesList = document.getElementById('lanes-list');
@@ -3061,3 +3744,44 @@ function updateLanesList() {
         lanesList.appendChild(option);
     });
 }
+
+window.searchCallForVehicle = function(plate, dateStr, timeStr) {
+    if (document.getElementById('search-plate')) {
+        document.getElementById('search-plate').value = plate;
+        document.getElementById('search-date').value = dateStr || '';
+        document.getElementById('search-time').value = timeStr || '';
+        
+        const allTabBtn = document.querySelector('button[onclick*="setOwnerListFilter(\'all\'"]');
+        if (allTabBtn) {
+            setOwnerListFilter('all', allTabBtn);
+        }
+        if (typeof triggerSearch === 'function') triggerSearch();
+        
+        const container = document.getElementById('all-calls-container');
+        if (container) container.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        window.location.href = `owner_dashboard.html?sp=${encodeURIComponent(plate)}&sd=${encodeURIComponent(dateStr)}&st=${encodeURIComponent(timeStr)}`;
+    }
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('sp')) {
+        setTimeout(() => {
+            if (document.getElementById('search-plate')) {
+                document.getElementById('search-plate').value = params.get('sp');
+                document.getElementById('search-date').value = params.get('sd') || '';
+                document.getElementById('search-time').value = params.get('st') || '';
+                
+                const allTabBtn = document.querySelector('button[onclick*="setOwnerListFilter(\'all\'"]');
+                if (allTabBtn) {
+                    setOwnerListFilter('all', allTabBtn);
+                }
+                if (typeof triggerSearch === 'function') triggerSearch();
+                
+                const container = document.getElementById('all-calls-container');
+                if (container) container.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 1000);
+    }
+});

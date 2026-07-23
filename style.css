@@ -1,3 +1,4 @@
+/* ================= GLOBAL STYLES ================= */
 :root {
     --base-font-size: 16px;
 }
@@ -58,12 +59,6 @@ body {
     direction: rtl;
 }
 
-@media (max-width: 480px) {
-    .global-clock {
-        font-size: 1rem;
-    }
-}
-
 /* Utility classes */
 .hidden {
     display: none !important;
@@ -82,12 +77,11 @@ body {
     margin-right: 30px;
     font-variant-numeric: tabular-nums;
 }
+
 html[dir="ltr"] .global-clock {
     margin-right: 0;
     margin-left: 30px;
 }
-
-
 
 .date-text {
     font-size: 0.85em;
@@ -374,8 +368,6 @@ select {
     margin-bottom: 20px;
 }
 
-
-
 .sub-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -405,9 +397,6 @@ select {
     font-weight: 700;
     color: var(--text-highlight) !important;
 }
-
-
-
 
 /* Recent Split */
 .recent-split {
@@ -445,17 +434,21 @@ select {
     overflow-y: auto;
     padding-right: 5px;
 }
+
 /* custom scrollbar for call-list to make it neat */
 .call-list::-webkit-scrollbar {
     width: 6px;
 }
+
 .call-list::-webkit-scrollbar-track {
     background: transparent;
 }
+
 .call-list::-webkit-scrollbar-thumb {
     background: rgba(150, 150, 150, 0.3);
     border-radius: 3px;
 }
+
 .call-list::-webkit-scrollbar-thumb:hover {
     background: rgba(150, 150, 150, 0.5);
 }
@@ -473,7 +466,9 @@ select {
 }
 
 .call-item .time { color: var(--color-muted-text) !important; font-size: 0.85rem; }
+
 .call-item .plate { font-weight: 600; color: var(--text-highlight); }
+
 .call-item .reason { font-size: 0.9rem; }
 
 .call-item.highlight {
@@ -576,7 +571,7 @@ tr:hover {
     display: flex;
     align-items: flex-end;
     gap: 10px;
-    padding-top: 20px;
+    padding-top: 85px;
     padding-bottom: 5px;
     position: relative;
     border-bottom: 1px solid var(--border-color);
@@ -585,13 +580,16 @@ tr:hover {
     overflow-x: auto;
     overflow-y: visible;
 }
+
 /* Scrollbar for charts */
 .chart-container::-webkit-scrollbar {
     height: 8px;
 }
+
 .chart-container::-webkit-scrollbar-track {
     background: transparent;
 }
+
 .chart-container::-webkit-scrollbar-thumb {
     background-color: var(--border-color);
     border-radius: 4px;
@@ -667,18 +665,22 @@ tr:hover {
     border-radius: var(--border-radius);
     transition: all 0.3s ease;
 }
+
 .tab-btn:hover {
     color: var(--text-main);
     background: rgba(255,255,255,0.05);
 }
+
 .tab-btn.active {
     color: #ffffff;
     background: rgba(255,255,255,0.15);
 }
+
 .tab-btn[data-target="tab-recent-ai"].active {
     color: var(--accent-green);
     background: rgba(8, 153, 129, 0.1);
 }
+
 .tab-btn[data-target="tab-blocked"].active {
     color: var(--accent-red);
     background: rgba(255, 69, 58, 0.1);
@@ -716,9 +718,11 @@ tr:hover {
     outline: none;
     width: 100%;
 }
+
 .adv-search-input:focus {
     border-color: var(--accent-blue);
 }
+
 select.adv-search-input {
     appearance: none;
     -webkit-appearance: none;
@@ -749,7 +753,6 @@ select.adv-search-input {
     animation: pulse-red 3s ease-out forwards;
 }
 
-
 /* Responsive */
 @media (max-width: 1024px) {
     /* stats-grid handles mobile now */
@@ -757,14 +760,6 @@ select.adv-search-input {
 
 .sub-stats-grid { grid-template-columns: 1fr; }
     .recent-split, .lists-split { flex-direction: column; display: flex !important; }
-}
-
-@media (max-width: 768px) {
-    #login-screen { flex-direction: column; }
-    .stats-grid { grid-template-columns: 1fr; }
-    .global-clock { position: static; text-align: center; margin-bottom: 10px; background: transparent; color: var(--text-main); }
-    .dashboard-header { flex-direction: column; align-items: stretch; gap: 10px; }
-    .header-left, .header-right { justify-content: space-between; }
 }
 
 @keyframes pulse-green {
@@ -935,7 +930,6 @@ html[dir="ltr"] .recent-split .operator-panel {
     gap: 5px;
 }
 
-
 @keyframes pulse-logo {
     0% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.05); opacity: 0.8; }
@@ -956,7 +950,7 @@ html[dir="ltr"] .recent-split .operator-panel {
         z-index: 0;
     }
     .login-right .bg-img {
-        content: url("phone_background.png") !important;
+        object-fit: cover;
     }
     .login-left {
         position: absolute;
@@ -991,9 +985,11 @@ html[dir="ltr"] .recent-split .operator-panel {
     border-radius: 6px;
     transition: all 0.2s;
 }
+
 .nav-role-btn:hover {
     background: rgba(128, 128, 128, 0.2);
 }
+
 .nav-role-btn.active {
     background: #b8860b; /* brown-gold */
     color: white;
@@ -1134,38 +1130,11 @@ html[dir="ltr"] .recent-split .operator-panel {
     margin-bottom: 8px;
 }
 
-@media (max-width: 768px) {
-    .legal-modal-body {
-        flex-direction: column;
-    }
-    .legal-sidebar {
-        width: 100%;
-        border-left: none;
-        border-bottom: 1px solid var(--border-color);
-        flex-direction: row;
-        overflow-x: auto;
-        padding: 0;
-    }
-    .legal-nav-btn {
-        flex: 1;
-        text-align: center;
-        border-right: none;
-        border-bottom: 4px solid transparent;
-        white-space: nowrap;
-    }
-    .legal-nav-btn.active {
-        border-right-color: transparent;
-        border-bottom-color: var(--accent-blue);
-    }
-    .legal-content-area {
-        padding: 20px;
-    }
-}
-
 @keyframes flashRed {
     0% { background-color: rgba(255, 50, 50, 0.4); }
     100% { background-color: transparent; }
 }
+
 .new-row-flash {
     animation: flashRed 3s ease-out forwards;
 }
@@ -1231,6 +1200,7 @@ html[dir="ltr"] .recent-split .operator-panel {
     box-sizing: border-box;
     border-radius: var(--border-radius) !important;
 }
+
 .square-btn:hover {
     background: var(--bg-panel) !important;
 }
@@ -1309,13 +1279,36 @@ html[dir="ltr"] .recent-split .operator-panel {
         position: static !important;
         margin: 0 !important;
         width: 100%;
+        display: flex !important;
         justify-content: center;
         flex-wrap: wrap;
     }
     #role-nav-buttons {
-        margin: 0 !important;
-        width: 100%;
-        justify-content: center;
+        display: none !important;
+    }
+    
+    #greeting-container {
+        display: none !important;
+    }
+
+    .nav-role-btn {
+        background: rgba(41, 98, 255, 0.1);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 8px 16px;
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.2s;
+        flex: 1;
+        text-align: center;
+    }
+
+    .nav-role-btn.active {
+        background: #b8860b;
+        color: white;
+        border-color: #b8860b;
     }
     
     /* Position Clock, Date, Connection Light absolutely within the header */
@@ -1443,8 +1436,10 @@ html[dir="ltr"] .recent-split .operator-panel {
     #connection-status-icon {
         display: none !important;
     }
+    .desktop-only {
+        display: none !important;
+    }
 }
-
 
 /* =========================================
    MOBILE SPA DROPDOWN MENU & LAYOUT
@@ -1453,263 +1448,6 @@ html[dir="ltr"] .recent-split .operator-panel {
 .mobile-home-bg {
     display: none !important;
 }
-
-@media (max-width: 768px) {
-    /* Default Dashboard background is solid dark gray */
-    body {
-        background: #181c25 !important;
-    }
-
-    /* Ensure the screen takes exactly full height to stretch the background */
-    body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) #dashboard-screen {
-        height: 100vh !important;
-        overflow: hidden !important;
-    }
-
-    body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .mobile-home-bg {
-        display: block !important;
-        position: absolute !important;
-        top: -20px !important; /* Pull up further to ensure no gap */
-        left: 0 !important;
-        width: 100% !important;
-        height: calc(100% + 20px) !important;
-        object-fit: cover !important;
-        object-position: center 85% !important; /* Move image up to clear footer and bring logo closer to top */
-        margin: 0 !important;
-        padding: 0 !important;
-        z-index: 0;
-    }
-    
-    body:not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content {
-        padding: 0 !important;
-        margin: 0 !important;
-        position: relative !important;
-        flex: 1 !important;
-        min-height: 0 !important;
-    }
-    
-    /* Removed dark overlay so the background image is clearly visible */
-
-    /* Hide all main sections by default */
-    .dashboard-content > .stats-controls,
-    .dashboard-content > .stats-grid,
-    .dashboard-content > hr,
-    .dashboard-content > .graph-section,
-    .dashboard-content > .all-calls-section,
-    .dashboard-content > .sub-stats-grid,
-    .dashboard-content > .recent-split {
-        display: none !important;
-    }
-    
-    /* Hide specific sub-components depending on view */
-    #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(1), /* Graph */
-    #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(2), /* List */
-    #mobile-rules-section > div[style*="display: grid"] > div:nth-child(1), /* Whitelist */
-    #mobile-rules-section > div[style*="display: grid"] > div:nth-child(2) /* Blacklist */ {
-        display: none !important;
-    }
-
-    
-    /* Operator Dashboard Mobile Views for .recent-split */
-    
-    /* hide .recent-split panels by default */
-    .dashboard-content > .recent-split > .operator-panel,
-    .dashboard-content > .recent-split > .ai-panel {
-        display: none !important;
-    }
-
-    /* .show-recent-calls : show operator-panel */
-    body.show-recent-calls .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
-    body.show-recent-calls .dashboard-content > .recent-split > .operator-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
-
-    /* .show-ai-calls : show ai-panel */
-    body.show-ai-calls .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
-    body.show-ai-calls .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
-    body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
-    body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > #tab-recent-ai { display: block !important; }
-
-    /* .show-rules-black : show ai-panel -> tab-blocked */
-    body.show-rules-black .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
-    body.show-rules-black .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
-    body.show-rules-black .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
-    body.show-rules-black .dashboard-content > .recent-split > .ai-panel > #tab-blocked { display: flex !important; }
-
-    /* .show-rules-white : show ai-panel -> tab-authorized */
-    body.show-rules-white .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
-    body.show-rules-white .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
-    body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
-    body.show-rules-white .dashboard-content > .recent-split > .ai-panel > #tab-authorized { display: flex !important; }
-    
-    /* Hide the tab-buttons in mobile when using the dropdown */
-    body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
-    body.show-rules-black .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
-    body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-buttons {
-        display: none !important;
-    }
-
-    /* Show mobile-view-title in dropdown views */
-    body.show-ai-calls .mobile-view-title,
-    body.show-rules-black .mobile-view-title,
-    body.show-rules-white .mobile-view-title {
-        display: block !important;
-    }
-/* -----------------------------------------
-       VIEW DISPLAY CLASSES
-       ----------------------------------------- */
-       
-
-    body.show-stats .dashboard-content > .stats-controls,
-    body.show-ai-cost .dashboard-content > .stats-controls,
-    body.show-load-graph .dashboard-content > .stats-controls,
-    body.show-all-calls .dashboard-content > .stats-controls {
-        display: flex !important;
-    }
-    body.show-stats .dashboard-content > .stats-grid,
-    body.show-stats .dashboard-content > .sub-stats-grid {
-        display: grid !important;
-    }
-    
-    body.show-ai-cost .dashboard-content > #mobile-ai-cost-section { display: block !important; }
-    body.show-ai-cost #mobile-ai-cost-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
-    body.show-ai-cost #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(1) { display: flex !important; width: 100%; min-height: 350px; }
-    
-    body.show-live-calls .dashboard-content > #mobile-ai-cost-section { display: block !important; margin-top: 0 !important; }
-    body.show-live-calls #mobile-ai-cost-section > .section-header { display: none !important; } /* Hide the title "עלויות וצריכת AI" when viewing just calls */
-    body.show-live-calls #mobile-ai-cost-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; height: calc(100vh - 200px) !important; }
-    body.show-live-calls #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(2) { display: flex !important; flex: 1; border: none; padding: 5px; background: transparent; }
-    
-    body.show-rules-white .dashboard-content > #mobile-rules-section { display: block !important; margin-top: 0 !important; }
-    body.show-rules-white #mobile-rules-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
-    body.show-rules-white #mobile-rules-section > div[style*="display: grid"] > div:nth-child(2) { display: flex !important; }
-    body.show-rules-white #mobile-rules-section > .section-header { display: none !important; }
-
-    body.show-rules-black .dashboard-content > #mobile-rules-section { display: block !important; margin-top: 0 !important; }
-    body.show-rules-black #mobile-rules-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
-    body.show-rules-black #mobile-rules-section > div[style*="display: grid"] > div:nth-child(1) { display: flex !important; }
-    body.show-rules-black #mobile-rules-section > .section-header { display: none !important; }
-
-    body.show-all-calls .dashboard-content > .all-calls-section { display: block !important; margin-top: 0 !important; }
-    
-    body.show-load-graph .dashboard-content > #mobile-load-graph-section { display: block !important; margin-top: 0 !important; }
-
-    body.show-print .dashboard-content > .stats-controls {
-        display: flex !important;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    /* -----------------------------------------
-       DROPDOWN MENU UI (TradingView Style)
-       ----------------------------------------- */
-       
-    .mobile-dropdown-container {
-        position: relative;
-        width: calc(100% + 30px);
-        margin-top: 0 !important;
-        margin-left: -15px !important;
-        margin-right: -15px !important;
-        margin-bottom: -15px !important;
-        padding: 0 !important;
-        z-index: 1000;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .mobile-dropdown-btn {
-        background: #181c25 !important;
-        border: none !important;
-        border-radius: 0 !important;
-        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
-        padding: 15px 20px;
-        color: #fff;
-        font-size: 1.1rem;
-        font-weight: 600;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        cursor: pointer;
-        backdrop-filter: blur(10px);
-        transition: all 0.2s ease;
-    }
-    
-    .mobile-dropdown-btn:active {
-        background: rgba(42, 46, 57, 1);
-    }
-    
-    .mobile-dropdown-btn svg {
-        transition: transform 0.2s ease;
-    }
-    
-    .mobile-dropdown-container.open .mobile-dropdown-btn svg {
-        transform: rotate(180deg);
-    }
-    
-    .mobile-dropdown-menu {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        margin-top: 8px;
-        background: #1e222d;
-        border: 1px solid #2a2e39;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        display: none;
-        flex-direction: column;
-        overflow-y: auto;
-        overflow-x: hidden;
-        max-height: 55vh;
-    }
-    
-    .mobile-dropdown-container.open .mobile-dropdown-menu {
-        display: flex;
-    }
-    
-    .mobile-dropdown-item {
-        padding: 15px 20px;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        color: #d1d4dc;
-        text-decoration: none;
-        border-bottom: 1px solid #2a2e39;
-        cursor: pointer;
-        transition: background 0.2s ease;
-    }
-    
-    .mobile-dropdown-item:last-child {
-        border-bottom: none;
-    }
-    
-    .mobile-dropdown-item:active {
-        background: #2a2e39;
-    }
-    
-    .mobile-dropdown-item svg {
-        color: #787b86;
-        width: 20px;
-        height: 20px;
-    }
-    
-    .mobile-dropdown-item-content {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .mobile-dropdown-item-title {
-        font-size: 1rem;
-        font-weight: 500;
-        color: #fff;
-    }
-    
-    .mobile-dropdown-item-desc {
-        font-size: 0.8rem;
-        color: #787b86;
-        margin-top: 2px;
-    }
-}
-
-
 
 /* Combined Stats Styles */
 .combined-stat {
@@ -1750,21 +1488,486 @@ html[dir="ltr"] .recent-split .operator-panel {
     color: var(--text-muted);
 }
 
-
 /* Stats Layouts (Mobile vs Desktop) */
 .stats-mobile { display: none !important; }
+
 .stats-desktop { display: grid !important; }
 
-@media (max-width: 768px) {
-    .stats-mobile { display: flex !important; flex-direction: column; gap: 16px; margin-bottom: 20px; }
-    body.show-stats .dashboard-content > .stats-grid.stats-mobile { display: flex !important; }
-    body.show-stats .dashboard-content > .stats-grid.stats-desktop { display: none !important; }
+/* ================= DESKTOP STYLES ================= */
+@media (min-width: 769px) {
 }
 
+/* ================= MOBILE STYLES ================= */
 @media (max-width: 768px) {
+    .global-clock {
+            font-size: 1rem;
+        }
+
+    #login-screen { flex-direction: column; }
+        .stats-grid { grid-template-columns: 1fr; }
+        .global-clock { position: static; text-align: center; margin-bottom: 10px; background: transparent; color: var(--text-main); }
+        .dashboard-header { flex-direction: column; align-items: stretch; gap: 10px; }
+        .header-left, .header-right { justify-content: space-between; }
+
+    .legal-modal-body {
+            flex-direction: column;
+        }
+        .legal-sidebar {
+            width: 100%;
+            border-left: none;
+            border-bottom: 1px solid var(--border-color);
+            flex-direction: row;
+            overflow-x: auto;
+            padding: 0;
+        }
+        .legal-nav-btn {
+            flex: 1;
+            text-align: center;
+            border-right: none;
+            border-bottom: 4px solid transparent;
+            white-space: nowrap;
+        }
+        .legal-nav-btn.active {
+            border-right-color: transparent;
+            border-bottom-color: var(--accent-blue);
+        }
+        .legal-content-area {
+            padding: 20px;
+        }
+
+    /* Default Dashboard background is solid dark gray */
+        body {
+            background: #181c25 !important;
+        }
+    
+        /* Ensure the screen takes exactly full height to stretch the background */
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) #dashboard-screen {
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+    
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .mobile-home-bg {
+            display: block !important;
+            position: absolute !important;
+            top: -20px !important; /* Pull up further to ensure no gap */
+            left: 0 !important;
+            width: 100% !important;
+            height: calc(100% + 20px) !important;
+            object-fit: cover !important;
+            object-position: center 85% !important; /* Move image up to clear footer and bring logo closer to top */
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 0;
+        }
+        
+        body:not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content {
+            padding: 0 !important;
+            margin: 0 !important;
+            position: relative !important;
+            flex: 1 !important;
+            min-height: 0 !important;
+        }
+
+        /* Hide stats-controls when on the mobile home screen to avoid duplications */
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content > .stats-controls {
+            display: none !important;
+        }
+        
+        /* Removed dark overlay so the background image is clearly visible */
+    
+        /* Hide all main sections by default except stats-controls */
+        .dashboard-content > .stats-grid,
+        .dashboard-content > hr,
+        .dashboard-content > .graph-section,
+        .dashboard-content > .all-calls-section,
+        .dashboard-content > .sub-stats-grid,
+        .dashboard-content > .recent-split {
+            display: none !important;
+        }
+        
+        /* Hide specific sub-components depending on view */
+        #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(1), /* Graph */
+        #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(2), /* List */
+        #mobile-rules-section > div[style*="display: grid"] > div:nth-child(1), /* Whitelist */
+        #mobile-rules-section > div[style*="display: grid"] > div:nth-child(2) /* Blacklist */ {
+            display: none !important;
+        }
+    
+        
+        /* Operator Dashboard Mobile Views for .recent-split */
+        
+        /* hide .recent-split panels by default */
+        .dashboard-content > .recent-split > .operator-panel,
+        .dashboard-content > .recent-split > .ai-panel {
+            display: none !important;
+        }
+    
+        /* .show-recent-calls : show operator-panel */
+        body.show-recent-calls .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
+        body.show-recent-calls .dashboard-content > .recent-split > .operator-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
+    
+        /* .show-ai-calls : show ai-panel */
+        body.show-ai-calls .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
+        body.show-ai-calls .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
+        body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
+        body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > #tab-recent-ai { display: block !important; }
+    
+        /* .show-rules-black : show ai-panel -> tab-blocked */
+        body.show-rules-black .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
+        body.show-rules-black .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
+        body.show-rules-black .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
+        body.show-rules-black .dashboard-content > .recent-split > .ai-panel > #tab-blocked { display: flex !important; }
+    
+        /* .show-rules-white : show ai-panel -> tab-authorized */
+        body.show-rules-white .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
+        body.show-rules-white .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
+        body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
+        body.show-rules-white .dashboard-content > .recent-split > .ai-panel > #tab-authorized { display: flex !important; }
+        
+        /* Hide the tab-buttons in mobile when using the dropdown */
+        body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
+        body.show-rules-black .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
+        body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-buttons {
+            display: none !important;
+        }
+    
+        /* Show mobile-view-title in dropdown views */
+        body.show-ai-calls .mobile-view-title,
+        body.show-rules-black .mobile-view-title,
+        body.show-rules-white .mobile-view-title {
+            display: block !important;
+        }
+    /* -----------------------------------------
+           VIEW DISPLAY CLASSES
+           ----------------------------------------- */
+           
+        .dashboard-content > .stats-controls {
+            display: flex !important;
+            flex-direction: column;
+            gap: 10px;
+        }
+    
+        body.show-stats .dashboard-content > .stats-grid,
+        body.show-stats .dashboard-content > .sub-stats-grid {
+            display: grid !important;
+        }
+        
+        body.show-ai-cost .dashboard-content > #mobile-ai-cost-section { display: block !important; }
+        body.show-ai-cost #mobile-ai-cost-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
+        body.show-ai-cost #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(1) { display: flex !important; width: 100%; min-height: 350px; }
+        
+        body.show-live-calls .dashboard-content > #mobile-ai-cost-section { display: block !important; margin-top: 0 !important; }
+        body.show-live-calls #mobile-ai-cost-section > .section-header { display: none !important; } /* Hide the title "עלויות וצריכת AI" when viewing just calls */
+        body.show-live-calls #mobile-ai-cost-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; height: calc(100vh - 200px) !important; }
+        body.show-live-calls #mobile-ai-cost-section > div[style*="display: grid"] > div:nth-child(2) { display: flex !important; flex: 1; border: none; padding: 5px; background: transparent; }
+        
+        body.show-rules-white .dashboard-content > #mobile-rules-section { display: block !important; margin-top: 0 !important; }
+        body.show-rules-white #mobile-rules-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
+        body.show-rules-white #mobile-rules-section > div[style*="display: grid"] > div:nth-child(2) { display: flex !important; }
+        body.show-rules-white #mobile-rules-section > .section-header { display: none !important; }
+    
+        body.show-rules-black .dashboard-content > #mobile-rules-section { display: block !important; margin-top: 0 !important; }
+        body.show-rules-black #mobile-rules-section > div[style*="display: grid"] { display: flex !important; flex-direction: column; }
+        body.show-rules-black #mobile-rules-section > div[style*="display: grid"] > div:nth-child(1) { display: flex !important; }
+        body.show-rules-black #mobile-rules-section > .section-header { display: none !important; }
+    
+        body.show-all-calls .dashboard-content > .all-calls-section { display: block !important; margin-top: 0 !important; }
+        
+        body.show-load-graph .dashboard-content > #mobile-load-graph-section { display: block !important; margin-top: 0 !important; }
+    
+        body.show-print .dashboard-content > .stats-controls {
+            display: flex !important;
+            flex-direction: column;
+            align-items: stretch;
+        }
+    
+        /* -----------------------------------------
+           DROPDOWN MENU UI (TradingView Style)
+           ----------------------------------------- */
+           
+        .mobile-dropdown-container {
+            position: relative;
+            width: calc(100% + 30px);
+            margin-top: 0 !important;
+            margin-left: -15px !important;
+            margin-right: -15px !important;
+            margin-bottom: -15px !important;
+            padding: 0 !important;
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .mobile-dropdown-btn {
+            background: #181c25 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+            padding: 15px 20px;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+        
+        .mobile-dropdown-btn:active {
+            background: rgba(42, 46, 57, 1);
+        }
+        
+        .mobile-dropdown-btn svg {
+            transition: transform 0.2s ease;
+        }
+        
+        .mobile-dropdown-container.open .mobile-dropdown-btn svg {
+            transform: rotate(180deg);
+        }
+        
+        .mobile-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            background: #1e222d;
+            border: 1px solid #2a2e39;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            max-height: 55vh;
+        }
+        
+        .mobile-dropdown-container.open .mobile-dropdown-menu {
+            display: flex;
+        }
+        
+        .mobile-dropdown-item {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: #d1d4dc;
+            text-decoration: none;
+            border-bottom: 1px solid #2a2e39;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        
+        .mobile-dropdown-item:last-child {
+            border-bottom: none;
+        }
+        
+        .mobile-dropdown-item:active {
+            background: #2a2e39;
+        }
+        
+        .mobile-dropdown-item svg {
+            color: #787b86;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .mobile-dropdown-item-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .mobile-dropdown-item-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #fff;
+        }
+        
+        .mobile-dropdown-item-desc {
+            font-size: 0.8rem;
+            color: #787b86;
+            margin-top: 2px;
+        }
+
+    .stats-mobile { display: flex !important; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+        body.show-stats .dashboard-content > .stats-grid.stats-mobile,
+        body.show-ai-calls .dashboard-content > .stats-grid.stats-mobile,
+        body.show-recent-calls .dashboard-content > .stats-grid.stats-mobile { 
+            display: flex !important; 
+        }
+        body.show-stats .dashboard-content > .stats-grid.stats-desktop { display: none !important; }
+    
+        /* Hide irrelevant stats on mobile tabs */
+        body.show-ai-calls .dashboard-content > .stats-grid.stats-mobile > .operator-stat { display: none !important; }
+        body.show-recent-calls .dashboard-content > .stats-grid.stats-mobile > .ai-stat { display: none !important; }
+
     #owner-timeframe-tabs, #operator-timeframe-tabs {
+            display: none !important;
+        }
+
+    
+
+}
+
+/* Mobile List Redesign (image_7.png style) */
+.call-item-container {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    text-align: right;
+    background: var(--bg-card, transparent);
+    transition: background 0.2s;
+    cursor: default;
+    margin-bottom: 10px;
+}
+#recent-op-list .call-item-container {
+    cursor: pointer;
+}
+.call-item-title {
+    font-weight: bold; 
+    font-size: 1rem; 
+    color: var(--text-color); 
+    margin-bottom: 4px;
+}
+.call-item-subtitle {
+    font-size: 0.8rem; 
+    color: var(--color-muted-text) !important; 
+    margin-bottom: 4px;
+}
+.call-item-reason {
+    font-weight: normal; 
+    font-size: 0.81em; 
+    margin-top: 5px;
+}
+
+@media screen and (max-width: 1024px) {
+    /* Moked and AI Lists (Revert compressed layout to multi-line card) */
+    .call-item-container {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        padding: 12px !important;
+        gap: 6px !important;
+    }
+    .call-item-title {
+        margin-bottom: 4px !important;
+        font-size: 1.1rem !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    .call-item-subtitle {
+        margin-bottom: 4px !important;
+        font-size: 0.85rem !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        text-align: right !important;
+    }
+    .call-item-reason {
+        margin-top: 4px !important;
+        font-size: 0.9rem !important;
+        text-align: right !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    .call-item-reason br {
+        display: block !important;
+    }
+    .call-item-reason > div {
+        display: block !important;
+        margin-bottom: 6px !important;
+        margin-left: 0 !important;
+    }
+
+    /* Hide Desktop Table and Show Mobile List */
+    .desktop-calls-table {
+        display: none !important;
+    }
+    #mobile-calls-list {
+        display: block !important;
+        margin: 0;
+        padding: 0;
+        list-style-type: none;
+    }
+    
+    #calls-table-body td {
+        border: none !important;
+        padding: 0 !important;
+        text-align: right !important;
+        font-size: 0.9rem;
+    }
+
+    /* 4: Plate Display -> title */
+    #calls-table-body td:nth-child(4) {
+        order: 1;
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: var(--text-color);
+        margin-bottom: 2px;
+    }
+    
+    /* 5: Driver */
+    #calls-table-body td:nth-child(5) {
+        order: 2;
+        font-size: 0.9rem;
+        color: var(--color-muted-text);
+        margin-bottom: 4px;
+    }
+    
+    /* 1: Date/Time */
+    #calls-table-body td:nth-child(1) {
+        order: 3;
+        font-size: 0.85rem;
+        color: var(--color-muted-text);
+    }
+    
+    /* 2: Parking */
+    #calls-table-body td:nth-child(2) {
+        order: 4;
+        font-size: 0.85rem;
+        color: var(--color-muted-text);
+        margin-bottom: 6px;
+    }
+    
+    /* 7: Request */
+    #calls-table-body td:nth-child(7) {
+        order: 5;
+        font-size: 0.9rem;
+        margin-top: 2px;
+    }
+    #calls-table-body td:nth-child(7)::before {
+        content: "בקשה: ";
+        font-weight: bold;
+        color: var(--color-req);
+    }
+    
+    /* 8: Actions */
+    #calls-table-body td:nth-child(8) {
+        order: 6;
+        font-size: 0.9rem;
+        margin-top: 2px;
+    }
+    #calls-table-body td:nth-child(8)::before {
+        content: "פעולה: ";
+        font-weight: bold;
+        color: var(--color-act);
+    }
+    
+    /* 9: Status */
+    #calls-table-body td:nth-child(9) {
+        order: 7;
+        margin-top: 6px;
+    }
+    
+    /* Hide Lane and Duration */
+    #calls-table-body td:nth-child(3),
+    #calls-table-body td:nth-child(6) {
         display: none !important;
     }
 }
-
-
