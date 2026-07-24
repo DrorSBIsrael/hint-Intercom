@@ -34,8 +34,9 @@ function fixApiDates(data) {
     }
 })();
 
-// State
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+    ? (window.location.port ? `http://${window.location.hostname}:${window.location.port}` : 'http://localhost:8080') 
+    : (window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:8080' : 'https://hint-intercom-backend.onrender.com');
 
 let allCalls = [];
 let filteredCalls = [];
@@ -312,22 +313,21 @@ function updateClock() {
         const parkingSelect = document.getElementById('parking-selector');
         let parkingName = '';
         if (parkingSelect && parkingSelect.options.length > 0 && parkingSelect.value !== 'all') {
-            parkingName = parkingSelect.options[parkingSelect.selectedIndex].text;
+            parkingName = parkingSelect.options[parkingSelect.selectedIndex].text || '';
+            // Strip number in parentheses e.g. "(מס' 470021002)"
+            parkingName = parkingName.replace(/\s*\([^)]*\)/g, '').trim();
         }
         
-        // As requested: instead of "All Parkings" (כל החניות), write the username.
-        // We will put them on a single line: [Greeting] [Username]
-        let htmlStr = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; width: 100%;">`;
-        
-        htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; color: var(--text-highlight); line-height: 1;">${t(transKey)}</span>`;
-        
+        const greetingText = t(transKey);
+        let parts = [greetingText];
         if (username) {
-            htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; opacity: 0.85; line-height: 1;">${username}</span>`;
+            parts.push(username);
         }
         if (parkingName) {
-            htmlStr += `<span style="font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin-top: 2px;">ב${parkingName}</span>`;
+            parts.push(`חניון: ${parkingName}`);
         }
-        htmlStr += `</div>`;
+        
+        let htmlStr = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; width: 100%; font-size: 1.35rem; font-weight: 700; color: var(--text-highlight); line-height: 1;">${parts.join(' - ')}</div>`;
         
         greetingEls.forEach(el => el.innerHTML = htmlStr);
     }
@@ -555,6 +555,46 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 // Dashboard Logic & Data Fetching
 // ----------------------------------------------------
 
+window.notifiedCallIds = window.notifiedCallIds || new Set();
+let isInitialCallsLoaded = false;
+
+function notifyOperatorCallIfNew(call) {
+    if (!call || !call.id) return false;
+    const callId = String(call.id);
+    
+    // If already seen/notified, never beep again
+    if (window.notifiedCallIds.has(callId)) {
+        return false;
+    }
+    
+    // Mark as notified/seen
+    window.notifiedCallIds.add(callId);
+    
+    // Do not beep on initial page load for historical calls
+    if (!isInitialCallsLoaded) {
+        return false;
+    }
+    
+    // Must be forwarded to human operator (NOT AI calls)
+    const isForwarded = String(call.is_forwarded).toLowerCase() === 'true' || call.is_forwarded === true;
+    if (!isForwarded) {
+        return false;
+    }
+    
+    // Must be very recent (created within the last 2 minutes)
+    const callTime = new Date(call.created_at).getTime();
+    const now = Date.now();
+    const isVeryRecent = !isNaN(callTime) && (now - callTime) < 120000;
+    
+    if (isVeryRecent) {
+        console.log("🔔 [BEEP TRIGGERED] Forwarded operator call:", callId, call.plate_number);
+        playNotificationSound();
+        return true;
+    }
+    
+    return false;
+}
+
 async function pollOperatorCallsFast() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/operator_calls?t=${Date.now()}`);
@@ -564,36 +604,28 @@ async function pollOperatorCallsFast() {
         opCalls = filterDataByAllowedParkings(opCalls);
         
         let shouldRender = false;
-        let shouldBeep = false;
-        window.notifiedCallIds = window.notifiedCallIds || new Set();
         
         opCalls.forEach(opCall => {
             const existingIdx = allCalls.findIndex(c => String(c.id) === String(opCall.id));
             if (existingIdx === -1) {
-                // Completely new call (or old one falling out of cache)
+                // Completely new call
                 opCall.isNew = true;
                 allCalls.unshift(opCall);
                 shouldRender = true;
                 
-                if (!window.notifiedCallIds.has(String(opCall.id))) {
-                    const isRecent = (Date.now() - new Date(opCall.created_at).getTime()) < 1000 * 60 * 60; // 1 hour
-                    if (isRecent) {
-                        shouldBeep = true;
-                    }
-                    window.notifiedCallIds.add(String(opCall.id));
-                }
+                notifyOperatorCallIfNew(opCall);
             } else {
-                // Exists, check if it just became forwarded
+                // Check if it just became forwarded
                 const oldCall = allCalls[existingIdx];
-                if (String(oldCall.is_forwarded).toLowerCase() !== 'true') {
+                const wasForwarded = String(oldCall.is_forwarded).toLowerCase() === 'true';
+                const isNowForwarded = String(opCall.is_forwarded).toLowerCase() === 'true';
+                
+                if (!wasForwarded && isNowForwarded) {
                     opCall.isNew = true;
                     allCalls[existingIdx] = opCall;
                     shouldRender = true;
                     
-                    if (!window.notifiedCallIds.has(String(opCall.id))) {
-                        shouldBeep = true;
-                        window.notifiedCallIds.add(String(opCall.id));
-                    }
+                    notifyOperatorCallIfNew(opCall);
                 }
             }
         });
@@ -601,9 +633,6 @@ async function pollOperatorCallsFast() {
         if (shouldRender) {
             allCalls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             applyFilters();
-        }
-        if (shouldBeep) {
-            playNotificationSound();
         }
     } catch (e) {
         console.error("Fast polling error:", e);
@@ -641,13 +670,15 @@ async function fetchInitialCalls() {
             
             if (allCalls.length === 0) {
                 allCalls = newCalls;
+                newCalls.forEach(c => {
+                    if (c && c.id) window.notifiedCallIds.add(String(c.id));
+                });
+                isInitialCallsLoaded = true;
             } else {
                 // Check for genuinely new calls
                 const genuinelyNewCalls = newCalls.filter(nc => !allCalls.find(oc => String(oc.id) === String(nc.id)));
                 if (genuinelyNewCalls.length > 0) {
-                    if (genuinelyNewCalls.some(nc => String(nc.is_forwarded).toLowerCase() === 'true')) {
-                        playSound = true;
-                    }
+                    genuinelyNewCalls.forEach(nc => notifyOperatorCallIfNew(nc));
                 }
                 
                 // Check top 10 for updates to is_forwarded
@@ -656,7 +687,7 @@ async function fetchInitialCalls() {
                     const oc = allCalls.find(c => String(c.id) === String(nc.id));
                     if (oc && String(oc.is_forwarded).toLowerCase() === 'false' && String(nc.is_forwarded).toLowerCase() === 'true') {
                         nc.isNew = true;
-                        playSound = true;
+                        notifyOperatorCallIfNew(nc);
                     }
                 }
                 
@@ -678,6 +709,7 @@ async function fetchInitialCalls() {
                 merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 allCalls = merged;
+                isInitialCallsLoaded = true;
             }
             
             const role = sessionStorage.getItem('intercom_user_role');
@@ -761,10 +793,6 @@ async function fetchInitialCalls() {
         }
         
         calculateAICosts(allCalls);
-        
-        if (playSound && !isInitialLoad) {
-            playNotificationSound();
-        }
     } catch (e) {
         console.error("Failed to poll CSV", e);
     }
@@ -801,6 +829,10 @@ async function initDashboard() {
             supabaseClient
               .channel('realtime-calls')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'calls_log' }, payload => {
+                console.log("⚡ Realtime PUSH: calls_log event", payload.eventType);
+                if (typeof pollOperatorCallsFast === 'function') {
+                    pollOperatorCallsFast().catch(e => console.warn(e));
+                }
                 let newCall = payload.new;
                 if (!newCall) return; // handles DELETE where payload.new is null
                 
@@ -821,11 +853,7 @@ async function initDashboard() {
                     newCall.isNew = true;
                     // Add to start of array
                     allCalls.unshift(newCall);
-                    
-                    // Play notification sound ONLY if it's forwarded to the operator
-                    if (String(newCall.is_forwarded).toLowerCase() === 'true') {
-                        playNotificationSound();
-                    }
+                    notifyOperatorCallIfNew(newCall);
                 } else if (payload.eventType === 'UPDATE') {
                     const existingIdx = allCalls.findIndex(c => String(c.id) === String(newCall.id));
                     if (existingIdx !== -1) {
@@ -835,17 +863,15 @@ async function initDashboard() {
                         
                         allCalls[existingIdx] = newCall;
                         
-                        // If it changed from NOT forwarded to forwarded, play the sound!
+                        // If it changed from NOT forwarded to forwarded, notify!
                         if (!wasForwarded && isNowForwarded) {
                             newCall.isNew = true;
-                            playNotificationSound();
+                            notifyOperatorCallIfNew(newCall);
                         }
                     } else {
                         // Not in list yet, treat as insert
                         allCalls.unshift(newCall);
-                        if (String(newCall.is_forwarded).toLowerCase() === 'true') {
-                            playNotificationSound();
-                        }
+                        notifyOperatorCallIfNew(newCall);
                     }
                 }
                 
@@ -853,23 +879,46 @@ async function initDashboard() {
                 applyFilters();
                 calculateAICosts(allCalls);
               })
-              .subscribe();
+              .subscribe((status) => {
+                  console.log("⚡ Supabase Realtime Calls Status:", status);
+                  if (status === 'SUBSCRIBED') {
+                      window.isRealtimeConnected = true;
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(15000);
+                  } else {
+                      window.isRealtimeConnected = false;
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(3000);
+                  }
+              });
               
             supabaseClient
               .channel('realtime-lists')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'blacklist' }, payload => {
+                  console.log("⚡ Realtime PUSH: blacklist changed", payload.eventType);
                   if (typeof fetchAndRenderActionList === 'function') {
                       fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e));
                   }
               })
               .on('postgres_changes', { event: '*', schema: 'public', table: 'whitelist' }, payload => {
+                  console.log("⚡ Realtime PUSH: whitelist changed", payload.eventType);
                   if (typeof fetchAndRenderActionList === 'function') {
                       fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e));
                   }
               })
-              .subscribe();
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
+                  console.log("⚡ Realtime PUSH: users changed", payload.eventType);
+                  if (typeof fetchParkingNames === 'function') {
+                      fetchParkingNames().catch(e => console.warn('Parking names fetch skipped', e));
+                  }
+                  if (typeof loadUsers === 'function') {
+                      loadUsers();
+                  }
+              })
+              .subscribe((status) => {
+                  console.log("⚡ Supabase Realtime push status:", status);
+              });
               
-            console.log("Supabase Realtime connected for calls and lists!");
+            window.supabaseClient = supabaseClient;
+            console.log("✅ Supabase Realtime Push active across all tables (calls_log, blacklist, whitelist, users)!");
         }
     } catch(e) {
         console.error("Failed to setup realtime", e);
@@ -1416,7 +1465,8 @@ function updateRecentCalls() {
                 alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
-            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            let rawPlate = c.plate_number || 'לא ידוע';
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש בטבלה למטה" style="cursor: pointer; user-select: text;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1511,7 +1561,8 @@ function updateRecentCalls() {
                 alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.95em;">רכב מורשה סיבה (${notes})</div>`;
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
-            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            let rawPlate = c.plate_number || 'לא ידוע';
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש בטבלה למטה" style="cursor: pointer; user-select: text;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1602,6 +1653,54 @@ function triggerSearch() {
     }
     updateTable();
 }
+
+function searchPlateInTable(plateNumber) {
+    if (!plateNumber) return;
+    const cleanPlate = String(plateNumber).replace(/[^0-9a-zA-Z]/g, '').trim();
+    if (!cleanPlate) return;
+    
+    const plateInput = document.getElementById('search-plate') || 
+                       document.getElementById('global-search') || 
+                       document.querySelector('.search-plate-input');
+                       
+    if (plateInput) {
+        plateInput.value = cleanPlate;
+        if (typeof triggerSearch === 'function') {
+            triggerSearch();
+        } else {
+            plateInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+    
+    if (typeof updateTable === 'function') {
+        updateTable();
+    }
+    
+    const targetSection = document.getElementById('search-plate') || 
+                          document.getElementById('calls-table-container') || 
+                          document.getElementById('callsTableBody') ||
+                          document.getElementById('calls-table-body') ||
+                          document.querySelector('.table-wrapper') ||
+                          document.querySelector('.action-table');
+                          
+    if (targetSection) {
+        targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    if (plateInput) {
+        setTimeout(() => {
+            plateInput.focus();
+            plateInput.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+            plateInput.style.borderColor = '#34c759';
+            plateInput.style.boxShadow = '0 0 12px rgba(52, 199, 89, 0.8)';
+            setTimeout(() => {
+                plateInput.style.boxShadow = '';
+                plateInput.style.borderColor = '';
+            }, 1800);
+        }, 300);
+    }
+}
+window.searchPlateInTable = searchPlateInTable;
 
 searchInputs.forEach(input => {
     if(input) {
@@ -1800,7 +1899,7 @@ function renderTableRows() {
             <td class="desktop-td">${dateStr}</td>
             <td class="desktop-td">${parkingName}</td>
             <td class="desktop-td">${c.lane_id}</td>
-            <td class="desktop-td" style="direction: ltr; text-align: right;">${plateDisplay}</td>
+            <td class="desktop-td" style="direction: ltr; text-align: right; cursor: pointer;" ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לסינון לפי רכב זה">${plateDisplay}</td>
             <td class="desktop-td">${c.driver_name || '-'}${c.driver_phone ? '<br><span style="font-size:0.85em;color:gray;">' + c.driver_phone + '</span>' : ''}</td>
             <td class="desktop-td">${c.call_duration}s</td>
             <td class="desktop-td">${c.request_summary || '-'}</td>
@@ -2357,29 +2456,31 @@ tabButtons.forEach(btn => {
 
 let globalPollingInterval = null;
 window.isListInteractionActive = false;
+window.isRealtimeConnected = false;
+
+function setAdaptivePollingInterval(ms) {
+    if (window.fastOperatorInterval) clearInterval(window.fastOperatorInterval);
+    window.fastOperatorInterval = setInterval(() => {
+        if (typeof pollOperatorCallsFast === 'function') {
+            pollOperatorCallsFast().catch(e => console.warn(e));
+        }
+    }, ms);
+}
+window.setAdaptivePollingInterval = setAdaptivePollingInterval;
 
 function startGlobalPolling() {
     if (globalPollingInterval) clearInterval(globalPollingInterval);
     
+    // Default interval: if Realtime WebSocket is active, gentle 15s check. Otherwise 3s fallback.
+    const intervalMs = window.isRealtimeConnected ? 15000 : 3000;
+    setAdaptivePollingInterval(intervalMs);
+    
     globalPollingInterval = setInterval(() => {
-        // 2. HOVER & SCROLL GUARD
-        if (window.isListInteractionActive) return; // Skip entire polling tick silently
+        // HOVER & SCROLL GUARD for background heavy fetches
+        if (window.isListInteractionActive) return;
         
-        // 3. MOKED PAGE - FREEZE ON TABS
-        if (!document.getElementById('owner-dashboard-marker') && !document.getElementById('admin-dashboard-marker')) {
-            const activeTab = document.querySelector('.tab-btn.active');
-            if (activeTab) {
-                const targetId = activeTab.getAttribute('data-target');
-                if (targetId === 'tab-blocked' || targetId === 'tab-authorized') {
-                    return; // Pause completely
-                }
-            }
-        }
-        
-        // Call all polling functions
         if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
-        if (typeof pollOperatorCallsFast === 'function') pollOperatorCallsFast().catch(e => console.error(e));
-    }, 60000); // SINGLE 60s TIMER
+    }, 30000); // 30s background sync
 }
 
 window.scrollGuardTimeout = null;

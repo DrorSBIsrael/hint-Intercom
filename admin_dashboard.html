@@ -495,7 +495,9 @@
         // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
         async function initAdminPanel() {
             try {
-                const LOCAL_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
+                const LOCAL_API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                    ? (window.location.port ? `http://${window.location.hostname}:${window.location.port}` : 'http://localhost:8080')
+                    : (window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:8080' : 'https://hint-intercom-backend.onrender.com');
                 const response = await fetch(`${LOCAL_API_BASE}/api/config`);
                 if (!response.ok) throw new Error("Failed to fetch config from Render");
                 
