@@ -35,7 +35,13 @@ function fixApiDates(data) {
 })();
 
 // State
-const API_BASE_URL = (window.location.protocol === 'file:' || !window.location.hostname) ? 'http://localhost:8000' : '';
+const API_BASE_URL = (function() {
+    const host = window.location.hostname;
+    if (!host || host === 'localhost' || host === '127.0.0.1' || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) || window.location.protocol === 'file:') {
+        return (window.location.protocol === 'file:' || !host) ? 'http://localhost:8000' : '';
+    }
+    return 'https://hint-intercom-backend.onrender.com';
+})();
 
 let allCalls = [];
 let filteredCalls = [];
@@ -3780,6 +3786,16 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (allTabBtn) {
                     setOwnerListFilter('all', allTabBtn);
                 }
+                if (typeof triggerSearch === 'function') triggerSearch();
+                
+                const container = document.getElementById('all-calls-container');
+                if (container) container.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 1000);
+    }
+    startSessionMonitor();
+});
+
 function startSessionMonitor() {
     if (window._sessionMonitorInterval) return;
     
@@ -3814,7 +3830,3 @@ function startSessionMonitor() {
     checkSession();
     window._sessionMonitorInterval = setInterval(checkSession, 15000);
 }
-
-window.addEventListener('DOMContentLoaded', () => {
-    startSessionMonitor();
-});
