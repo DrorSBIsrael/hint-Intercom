@@ -1419,7 +1419,8 @@ function updateRecentCalls() {
                 alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.9em;">רכב מורשה סיבה (${notes})</div>`;
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
-            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            let rawPlate = c.plate_number || 'לא ידוע';
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1514,7 +1515,8 @@ function updateRecentCalls() {
                 alertHtml = `<div style="margin-bottom: 6px; color: #34c759; font-weight: bold; font-size: 0.95em;">רכב מורשה סיבה (${notes})</div>`;
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
-            let plateDisplayCard = c.plate_number || 'לא ידוע';
+            let rawPlate = c.plate_number || 'לא ידוע';
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1729,6 +1731,42 @@ function updateTable() {
     renderTableRows();
 }
 
+function searchPlateInTable(plateNumber) {
+    if (!plateNumber || plateNumber === '-' || plateNumber === 'לא ידוע') return;
+    const cleanPlate = String(plateNumber).trim();
+    
+    const plateInput = document.getElementById('search-plate') || 
+                       document.querySelector('.search-plate-input') || 
+                       document.querySelector('.adv-search-input') ||
+                       document.getElementById('search-input');
+                       
+    if (plateInput) {
+        plateInput.value = cleanPlate;
+        plateInput.dispatchEvent(new Event('input', { bubbles: true }));
+        plateInput.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        if (typeof applyFilters === 'function') {
+            applyFilters();
+        } else if (typeof triggerSearch === 'function') {
+            triggerSearch();
+        }
+    }
+    
+    const allTabBtn = document.querySelector('button[onclick*="setOwnerListFilter(\'all\'"]');
+    if (allTabBtn && typeof setOwnerListFilter === 'function') {
+        setOwnerListFilter('all', allTabBtn);
+    }
+    
+    const targetSection = document.getElementById('all-calls-container') || 
+                          document.getElementById('search-plate') ||
+                          document.querySelector('.adv-search-input');
+                          
+    if (targetSection) {
+        targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+window.searchPlateInTable = searchPlateInTable;
+
 let currentRenderCount = 25;
 let currentCallsToShow = [];
 
@@ -1756,7 +1794,8 @@ function renderTableRows() {
         
         const tr = document.createElement('tr');
         if (c.isNew) tr.classList.add('new-row-flash');
-        let plateDisplay = c.plate_number || '-';
+        let rawPlate = c.plate_number || '-';
+        let plateDisplay = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
         if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
             plateDisplay += `<br><span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
         }
@@ -3054,7 +3093,8 @@ window.renderAICostList = function(callsList) {
             }
         }
         
-        const plate = c.plate_number || 'לא ידוע';
+        const rawPlate = c.plate_number || 'לא ידוע';
+        const plate = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
         const flashClass = c.isNew ? 'new-row-flash' : '';
         
         const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
