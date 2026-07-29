@@ -276,12 +276,9 @@ const elGlobalClock = document.getElementById('global-clock');
 
 // Helper to switch screens
 function showScreen(screenId) {
-    if (screenId === 'two-fa-screen') {
-        document.getElementById('two-fa-screen').classList.add('active');
-        return;
-    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
+    const target = document.getElementById(screenId);
+    if (target) target.classList.add('active');
 }
 
 // ----------------------------------------------------
@@ -317,8 +314,9 @@ function updateClock() {
         
         const parkingSelect = document.getElementById('parking-selector');
         let parkingName = '';
-        if (parkingSelect && parkingSelect.options.length > 0 && parkingSelect.value !== 'all') {
-            parkingName = parkingSelect.options[parkingSelect.selectedIndex].text;
+        if (parkingSelect && parkingSelect.options.length > 0 && parkingSelect.selectedIndex >= 0 && parkingSelect.value !== 'all') {
+            const opt = parkingSelect.options[parkingSelect.selectedIndex];
+            if (opt) parkingName = opt.text || '';
         }
         
         // As requested: instead of "All Parkings" (כל החניות), write the username.
@@ -367,11 +365,7 @@ if (loginForm) {
     const user = document.getElementById('username').value.trim();
     const pass = document.getElementById('password').value.trim();
     
-    // Check pattern explicitly in JS just in case
-    if (!/^[a-zA-Z0-9@]+$/.test(pass)) {
-        loginError.innerText = "הסיסמא יכולה להכיל רק אותיות, מספרים ו-@";
-        return;
-    }
+
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/login`, {
