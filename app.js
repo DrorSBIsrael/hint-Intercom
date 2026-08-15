@@ -860,10 +860,14 @@ async function initDashboard() {
                   console.log("⚡ Supabase Realtime Calls Status:", status);
                   if (status === 'SUBSCRIBED') {
                       window.isRealtimeConnected = true;
-                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(5000);
+                      // Realtime push is active — NO polling needed, zero Render traffic
+                      if (window.fastOperatorInterval) { clearInterval(window.fastOperatorInterval); window.fastOperatorInterval = null; }
+                      console.log("✅ Realtime PUSH active — polling disabled (saving Render bandwidth)");
                   } else {
                       window.isRealtimeConnected = false;
-                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(2000);
+                      // Realtime down — enable fast polling as emergency fallback
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(3000);
+                      console.warn("⚠️ Realtime disconnected — fast polling enabled (3s)");
                   }
               });
               
@@ -2423,10 +2427,12 @@ window.setAdaptivePollingInterval = setAdaptivePollingInterval;
 function startGlobalPolling() {
     if (globalPollingInterval) clearInterval(globalPollingInterval);
     
-    // Fast operator polling: 5s if Realtime connected, 2s if not
-    const intervalMs = window.isRealtimeConnected ? 5000 : 2000;
-    setAdaptivePollingInterval(intervalMs);
+    // Only start fast polling if Realtime is NOT connected
+    if (!window.isRealtimeConnected) {
+        setAdaptivePollingInterval(3000);
+    }
     
+    // Background full sync every 5 minutes (sanity check, not for real-time alerts)
     globalPollingInterval = setInterval(() => {
         // HOVER & SCROLL GUARD
         if (window.isListInteractionActive) return;
@@ -2442,10 +2448,8 @@ function startGlobalPolling() {
             }
         }
         
-        // Call all polling functions
         if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
-        if (typeof pollOperatorCallsFast === 'function') pollOperatorCallsFast().catch(e => console.error(e));
-    }, 30000); // Background full sync every 30s
+    }, 300000); // 5 minute background sync only
 }
 
 window.scrollGuardTimeout = null;
