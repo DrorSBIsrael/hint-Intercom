@@ -860,14 +860,12 @@ async function initDashboard() {
                   console.log("⚡ Supabase Realtime Calls Status:", status);
                   if (status === 'SUBSCRIBED') {
                       window.isRealtimeConnected = true;
-                      // Realtime push is active — NO polling needed, zero Render traffic
-                      if (window.fastOperatorInterval) { clearInterval(window.fastOperatorInterval); window.fastOperatorInterval = null; }
-                      console.log("✅ Realtime PUSH active — polling disabled (saving Render bandwidth)");
+                      // Realtime push active — light 15s safety-net polling (Supabase may not deliver all events)
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(15000);
                   } else {
                       window.isRealtimeConnected = false;
-                      // Realtime down — enable fast polling as emergency fallback
+                      // Realtime down — fast 3s polling fallback
                       if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(3000);
-                      console.warn("⚠️ Realtime disconnected — fast polling enabled (3s)");
                   }
               });
               
@@ -2427,17 +2425,14 @@ window.setAdaptivePollingInterval = setAdaptivePollingInterval;
 function startGlobalPolling() {
     if (globalPollingInterval) clearInterval(globalPollingInterval);
     
-    // Only start fast polling if Realtime is NOT connected
-    if (!window.isRealtimeConnected) {
-        setAdaptivePollingInterval(3000);
-    }
+    // Start adaptive polling: 15s if Realtime connected, 3s if not
+    const intervalMs = window.isRealtimeConnected ? 15000 : 3000;
+    setAdaptivePollingInterval(intervalMs);
     
-    // Background full sync every 5 minutes (sanity check, not for real-time alerts)
+    // Background full sync every 2 minutes
     globalPollingInterval = setInterval(() => {
-        // HOVER & SCROLL GUARD
         if (window.isListInteractionActive) return;
         
-        // MOKED PAGE - FREEZE ON TABS
         if (!document.getElementById('owner-dashboard-marker') && !document.getElementById('admin-dashboard-marker')) {
             const activeTab = document.querySelector('.tab-btn.active');
             if (activeTab) {
@@ -2449,7 +2444,7 @@ function startGlobalPolling() {
         }
         
         if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
-    }, 300000); // 5 minute background sync only
+    }, 120000); // 2 min background sync
 }
 
 window.scrollGuardTimeout = null;
