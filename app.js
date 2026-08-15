@@ -578,21 +578,26 @@ async function pollOperatorCallsFast() {
                 allCalls.unshift(opCall);
                 shouldRender = true;
                 
-                if (!window.notifiedCallIds.has(String(opCall.id))) {
-                    const isRecent = (Date.now() - new Date(opCall.created_at).getTime()) < 1000 * 60 * 60; // 1 hour
+                // Only beep for FORWARDED calls (not AI-handled)
+                const isForwarded = String(opCall.is_forwarded).toLowerCase() === 'true' || opCall.is_forwarded === true;
+                if (isForwarded && !window.notifiedCallIds.has(String(opCall.id))) {
+                    const isRecent = (Date.now() - new Date(opCall.created_at).getTime()) < 1000 * 120; // 2 minutes
                     if (isRecent) {
                         shouldBeep = true;
                     }
-                    window.notifiedCallIds.add(String(opCall.id));
                 }
+                window.notifiedCallIds.add(String(opCall.id));
             } else {
                 // Exists, check if it just became forwarded
                 const oldCall = allCalls[existingIdx];
-                if (String(oldCall.is_forwarded).toLowerCase() !== 'true') {
+                const wasForwarded = String(oldCall.is_forwarded).toLowerCase() === 'true' || oldCall.is_forwarded === true;
+                const isNowForwarded = String(opCall.is_forwarded).toLowerCase() === 'true' || opCall.is_forwarded === true;
+                
+                allCalls[existingIdx] = opCall;
+                
+                if (!wasForwarded && isNowForwarded) {
                     opCall.isNew = true;
-                    allCalls[existingIdx] = opCall;
                     shouldRender = true;
-                    
                     if (!window.notifiedCallIds.has(String(opCall.id))) {
                         shouldBeep = true;
                         window.notifiedCallIds.add(String(opCall.id));
