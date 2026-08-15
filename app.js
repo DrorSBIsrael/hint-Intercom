@@ -856,7 +856,16 @@ async function initDashboard() {
                 applyFilters();
                 calculateAICosts(allCalls);
               })
-              .subscribe();
+              .subscribe((status) => {
+                  console.log("⚡ Supabase Realtime Calls Status:", status);
+                  if (status === 'SUBSCRIBED') {
+                      window.isRealtimeConnected = true;
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(5000);
+                  } else {
+                      window.isRealtimeConnected = false;
+                      if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(2000);
+                  }
+              });
               
             supabaseClient
               .channel('realtime-lists')
@@ -2399,21 +2408,36 @@ tabButtons.forEach(btn => {
 
 let globalPollingInterval = null;
 window.isListInteractionActive = false;
+window.isRealtimeConnected = false;
+
+function setAdaptivePollingInterval(ms) {
+    if (window.fastOperatorInterval) clearInterval(window.fastOperatorInterval);
+    window.fastOperatorInterval = setInterval(() => {
+        if (typeof pollOperatorCallsFast === 'function') {
+            pollOperatorCallsFast().catch(e => console.warn(e));
+        }
+    }, ms);
+}
+window.setAdaptivePollingInterval = setAdaptivePollingInterval;
 
 function startGlobalPolling() {
     if (globalPollingInterval) clearInterval(globalPollingInterval);
     
+    // Fast operator polling: 5s if Realtime connected, 2s if not
+    const intervalMs = window.isRealtimeConnected ? 5000 : 2000;
+    setAdaptivePollingInterval(intervalMs);
+    
     globalPollingInterval = setInterval(() => {
-        // 2. HOVER & SCROLL GUARD
-        if (window.isListInteractionActive) return; // Skip entire polling tick silently
+        // HOVER & SCROLL GUARD
+        if (window.isListInteractionActive) return;
         
-        // 3. MOKED PAGE - FREEZE ON TABS
+        // MOKED PAGE - FREEZE ON TABS
         if (!document.getElementById('owner-dashboard-marker') && !document.getElementById('admin-dashboard-marker')) {
             const activeTab = document.querySelector('.tab-btn.active');
             if (activeTab) {
                 const targetId = activeTab.getAttribute('data-target');
                 if (targetId === 'tab-blocked' || targetId === 'tab-authorized') {
-                    return; // Pause completely
+                    return;
                 }
             }
         }
@@ -2421,7 +2445,7 @@ function startGlobalPolling() {
         // Call all polling functions
         if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
         if (typeof pollOperatorCallsFast === 'function') pollOperatorCallsFast().catch(e => console.error(e));
-    }, 60000); // SINGLE 60s TIMER
+    }, 30000); // Background full sync every 30s
 }
 
 window.scrollGuardTimeout = null;
