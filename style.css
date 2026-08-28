@@ -1632,18 +1632,27 @@ html[dir="ltr"] .recent-split .operator-panel {
         body.show-rules-white .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
         body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
         body.show-rules-white .dashboard-content > .recent-split > .ai-panel > #tab-authorized { display: flex !important; }
+
+        /* .show-suppliers : show ai-panel -> tab-suppliers (operator) or owner-suppliers-section (owner) */
+        body.show-suppliers .dashboard-content > .recent-split { display: flex !important; margin-top: 0 !important; }
+        body.show-suppliers .dashboard-content > .recent-split > .ai-panel { display: flex !important; flex-direction: column; height: calc(100vh - 120px); border: none !important; }
+        body.show-suppliers .dashboard-content > .recent-split > .ai-panel > .tab-content { display: none !important; }
+        body.show-suppliers .dashboard-content > .recent-split > .ai-panel > #tab-suppliers { display: flex !important; }
+        body.show-suppliers .dashboard-content > #owner-suppliers-section { display: flex !important; margin-top: 0 !important; }
         
         /* Hide the tab-buttons in mobile when using the dropdown */
         body.show-ai-calls .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
         body.show-rules-black .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
-        body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-buttons {
+        body.show-rules-white .dashboard-content > .recent-split > .ai-panel > .tab-buttons,
+        body.show-suppliers .dashboard-content > .recent-split > .ai-panel > .tab-buttons {
             display: none !important;
         }
     
         /* Show mobile-view-title in dropdown views */
         body.show-ai-calls .mobile-view-title,
         body.show-rules-black .mobile-view-title,
-        body.show-rules-white .mobile-view-title {
+        body.show-rules-white .mobile-view-title,
+        body.show-suppliers .mobile-view-title {
             display: block !important;
         }
     /* -----------------------------------------

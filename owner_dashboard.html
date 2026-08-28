@@ -127,6 +127,13 @@
                         <span class="mobile-dropdown-item-desc">רשימת הרכבים החסומים</span>
                     </div>
                 </a>
+                <a class="mobile-dropdown-item" onclick="switchMobileView('show-suppliers', 'ניהול ספקים')">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+                    <div class="mobile-dropdown-item-content">
+                        <span class="mobile-dropdown-item-title">ניהול ספקים</span>
+                        <span class="mobile-dropdown-item-desc">רשימת ספקים ובתי עסק</span>
+                    </div>
+                </a>
                 <a class="mobile-dropdown-item" onclick="switchMobileView('show-all-calls', 'כל השיחות')">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
                     <div class="mobile-dropdown-item-content">
@@ -154,7 +161,7 @@
 
 
         <main class="dashboard-content">
-            <img src="background.webp" class="mobile-home-bg" alt="Home Background">
+            <img src="background.png" class="mobile-home-bg" alt="Home Background">
             
             <!-- Stats Controls -->
             <div class="stats-controls" style="position: relative; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -367,6 +374,38 @@
                     </div>
                     
                 </div>
+
+                <!-- Suppliers Section -->
+                <div id="owner-suppliers-section" style="margin-top: 30px; background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid #ff9500; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
+                        <h3 style="color: #ff9500; margin: 0;">ניהול ספקים / בתי עסק</h3>
+                        <input type="text" id="search-suppliers" class="adv-search-input" placeholder="חיפוש ספק / עסק..." style="width: 250px; font-size: 0.85rem;">
+                    </div>
+                    
+                    <!-- Add Supplier Form -->
+                    <form id="owner-add-supplier-form" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; background: rgba(255, 149, 0, 0.05); padding: 15px; border-radius: 8px; border: 1px dashed rgba(255, 149, 0, 0.3);">
+                        <h4 style="margin: 0; font-size: 0.95rem; color: #ff9500;">הוספת ספק / בית עסק חדש:</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;">
+                            <select name="parking_id" required class="adv-search-input owner-parking-select" style="width: 100%;">
+                                <option value="">בחר חניון (חובה)</option>
+                            </select>
+                            <input type="text" name="business_name" placeholder="שם העסק / ספק (חובה)" required class="adv-search-input" style="width: 100%;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 10px;">
+                            <input type="text" name="contact_name" placeholder="שם איש קשר (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                            <input type="text" name="contact_phone" placeholder="טלפון (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                            <input type="text" name="notes" placeholder="הערות (אופציונלי)" class="adv-search-input" style="width: 100%;">
+                        </div>
+                        <button type="submit" class="btn-primary" style="background: #ff9500; color: #fff; align-self: flex-start; padding: 6px 18px; font-size: 0.9rem; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">הוסף ספק</button>
+                    </form>
+                    
+                    <!-- Suppliers List -->
+                    <div style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                        <ul id="owner-suppliers-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Injected by JS -->
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <!-- All Calls & Search -->
@@ -569,7 +608,7 @@
     </div>
 
     <script src="translations.js?v=1.1.23"></script>
-    <script src="app.js?v=4.1.3"></script>
+    <script src="app.js?v=4.0.8"></script>
     <script>
         if (sessionStorage.getItem('intercom_user_role') === 'admin') {
             const adminBtn = document.getElementById('nav-admin-btn');

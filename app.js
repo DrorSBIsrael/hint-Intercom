@@ -34,14 +34,9 @@ function fixApiDates(data) {
     }
 })();
 
-// State
-const API_BASE_URL = (function() {
-    const host = window.location.hostname;
-    if (!host || host === 'localhost' || host === '127.0.0.1' || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) || window.location.protocol === 'file:') {
-        return (window.location.protocol === 'file:' || !host) ? 'http://localhost:8000' : '';
-    }
-    return 'https://hint-intercom-backend.onrender.com';
-})();
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+    ? (window.location.port ? `http://${window.location.hostname}:${window.location.port}` : 'http://localhost:8080') 
+    : (window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:8080' : 'https://hint-intercom-backend.onrender.com');
 
 let allCalls = [];
 let filteredCalls = [];
@@ -276,9 +271,12 @@ const elGlobalClock = document.getElementById('global-clock');
 
 // Helper to switch screens
 function showScreen(screenId) {
+    if (screenId === 'two-fa-screen') {
+        document.getElementById('two-fa-screen').classList.add('active');
+        return;
+    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const target = document.getElementById(screenId);
-    if (target) target.classList.add('active');
+    document.getElementById(screenId).classList.add('active');
 }
 
 // ----------------------------------------------------
@@ -314,24 +312,22 @@ function updateClock() {
         
         const parkingSelect = document.getElementById('parking-selector');
         let parkingName = '';
-        if (parkingSelect && parkingSelect.options.length > 0 && parkingSelect.selectedIndex >= 0 && parkingSelect.value !== 'all') {
-            const opt = parkingSelect.options[parkingSelect.selectedIndex];
-            if (opt) parkingName = opt.text || '';
+        if (parkingSelect && parkingSelect.options.length > 0 && parkingSelect.value !== 'all') {
+            parkingName = parkingSelect.options[parkingSelect.selectedIndex].text || '';
+            // Strip number in parentheses e.g. "(מס' 470021002)"
+            parkingName = parkingName.replace(/\s*\([^)]*\)/g, '').trim();
         }
         
-        // As requested: instead of "All Parkings" (כל החניות), write the username.
-        // We will put them on a single line: [Greeting] [Username]
-        let htmlStr = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; width: 100%;">`;
-        
-        htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; color: var(--text-highlight); line-height: 1;">${t(transKey)}</span>`;
-        
+        const greetingText = t(transKey);
+        let parts = [greetingText];
         if (username) {
-            htmlStr += `<span style="font-size: 1.43rem; font-weight: 700; opacity: 0.85; line-height: 1;">${username}</span>`;
+            parts.push(username);
         }
         if (parkingName) {
-            htmlStr += `<span style="font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin-top: 2px;">ב${parkingName}</span>`;
+            parts.push(`חניון: ${parkingName}`);
         }
-        htmlStr += `</div>`;
+        
+        let htmlStr = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; width: 100%; font-size: 1.35rem; font-weight: 700; color: var(--text-highlight); line-height: 1;">${parts.join(' - ')}</div>`;
         
         greetingEls.forEach(el => el.innerHTML = htmlStr);
     }
@@ -365,7 +361,11 @@ if (loginForm) {
     const user = document.getElementById('username').value.trim();
     const pass = document.getElementById('password').value.trim();
     
-
+    // Check pattern explicitly in JS just in case
+    if (!/^[a-zA-Z0-9@]+$/.test(pass)) {
+        loginError.innerText = "הסיסמא יכולה להכיל רק אותיות, מספרים ו-@";
+        return;
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/login`, {
@@ -456,12 +456,9 @@ function checkTwoFaCode() {
         .then(data => {
             if (data.success) {
                 twoFaError.innerText = "";
-                if (data.auth_token) sessionStorage.setItem('intercom_auth_token', data.auth_token);
-                if (data.username) sessionStorage.setItem('username', data.username);
                 if (data.role) sessionStorage.setItem('intercom_user_role', data.role);
                 if (data.allowed_parkings) sessionStorage.setItem('intercom_allowed_parkings', JSON.stringify(data.allowed_parkings));
                 if (data.rate_per_minute) sessionStorage.setItem('intercom_rate_per_minute', data.rate_per_minute);
-                if (typeof startSessionMonitor === 'function') startSessionMonitor();
                 if (data.role === 'admin' || data.role === 'owner' || data.role === 'manager') {
                     window.location.href = 'owner_dashboard.html';
                 } else {
@@ -558,6 +555,46 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 // Dashboard Logic & Data Fetching
 // ----------------------------------------------------
 
+window.notifiedCallIds = window.notifiedCallIds || new Set();
+let isInitialCallsLoaded = false;
+
+function notifyOperatorCallIfNew(call) {
+    if (!call || !call.id) return false;
+    const callId = String(call.id);
+    
+    // If already seen/notified, never beep again
+    if (window.notifiedCallIds.has(callId)) {
+        return false;
+    }
+    
+    // Mark as notified/seen
+    window.notifiedCallIds.add(callId);
+    
+    // Do not beep on initial page load for historical calls
+    if (!isInitialCallsLoaded) {
+        return false;
+    }
+    
+    // Must be forwarded to human operator (NOT AI calls)
+    const isForwarded = String(call.is_forwarded).toLowerCase() === 'true' || call.is_forwarded === true;
+    if (!isForwarded) {
+        return false;
+    }
+    
+    // Must be very recent (created within the last 2 minutes)
+    const callTime = new Date(call.created_at).getTime();
+    const now = Date.now();
+    const isVeryRecent = !isNaN(callTime) && (now - callTime) < 120000;
+    
+    if (isVeryRecent) {
+        console.log("🔔 [BEEP TRIGGERED] Forwarded operator call:", callId, call.plate_number);
+        playNotificationSound();
+        return true;
+    }
+    
+    return false;
+}
+
 async function pollOperatorCallsFast() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/operator_calls?t=${Date.now()}`);
@@ -567,41 +604,28 @@ async function pollOperatorCallsFast() {
         opCalls = filterDataByAllowedParkings(opCalls);
         
         let shouldRender = false;
-        let shouldBeep = false;
-        window.notifiedCallIds = window.notifiedCallIds || new Set();
         
         opCalls.forEach(opCall => {
             const existingIdx = allCalls.findIndex(c => String(c.id) === String(opCall.id));
             if (existingIdx === -1) {
-                // Completely new call (or old one falling out of cache)
+                // Completely new call
                 opCall.isNew = true;
                 allCalls.unshift(opCall);
                 shouldRender = true;
                 
-                // Only beep for FORWARDED calls (not AI-handled)
-                const isForwarded = String(opCall.is_forwarded).toLowerCase() === 'true' || opCall.is_forwarded === true;
-                if (isForwarded && !window.notifiedCallIds.has(String(opCall.id))) {
-                    const isRecent = (Date.now() - new Date(opCall.created_at).getTime()) < 1000 * 120; // 2 minutes
-                    if (isRecent) {
-                        shouldBeep = true;
-                    }
-                }
-                window.notifiedCallIds.add(String(opCall.id));
+                notifyOperatorCallIfNew(opCall);
             } else {
-                // Exists, check if it just became forwarded
+                // Check if it just became forwarded
                 const oldCall = allCalls[existingIdx];
-                const wasForwarded = String(oldCall.is_forwarded).toLowerCase() === 'true' || oldCall.is_forwarded === true;
-                const isNowForwarded = String(opCall.is_forwarded).toLowerCase() === 'true' || opCall.is_forwarded === true;
-                
-                allCalls[existingIdx] = opCall;
+                const wasForwarded = String(oldCall.is_forwarded).toLowerCase() === 'true';
+                const isNowForwarded = String(opCall.is_forwarded).toLowerCase() === 'true';
                 
                 if (!wasForwarded && isNowForwarded) {
                     opCall.isNew = true;
+                    allCalls[existingIdx] = opCall;
                     shouldRender = true;
-                    if (!window.notifiedCallIds.has(String(opCall.id))) {
-                        shouldBeep = true;
-                        window.notifiedCallIds.add(String(opCall.id));
-                    }
+                    
+                    notifyOperatorCallIfNew(opCall);
                 }
             }
         });
@@ -609,9 +633,6 @@ async function pollOperatorCallsFast() {
         if (shouldRender) {
             allCalls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             applyFilters();
-        }
-        if (shouldBeep) {
-            playNotificationSound();
         }
     } catch (e) {
         console.error("Fast polling error:", e);
@@ -649,13 +670,15 @@ async function fetchInitialCalls() {
             
             if (allCalls.length === 0) {
                 allCalls = newCalls;
+                newCalls.forEach(c => {
+                    if (c && c.id) window.notifiedCallIds.add(String(c.id));
+                });
+                isInitialCallsLoaded = true;
             } else {
                 // Check for genuinely new calls
                 const genuinelyNewCalls = newCalls.filter(nc => !allCalls.find(oc => String(oc.id) === String(nc.id)));
                 if (genuinelyNewCalls.length > 0) {
-                    if (genuinelyNewCalls.some(nc => String(nc.is_forwarded).toLowerCase() === 'true')) {
-                        playSound = true;
-                    }
+                    genuinelyNewCalls.forEach(nc => notifyOperatorCallIfNew(nc));
                 }
                 
                 // Check top 10 for updates to is_forwarded
@@ -664,7 +687,7 @@ async function fetchInitialCalls() {
                     const oc = allCalls.find(c => String(c.id) === String(nc.id));
                     if (oc && String(oc.is_forwarded).toLowerCase() === 'false' && String(nc.is_forwarded).toLowerCase() === 'true') {
                         nc.isNew = true;
-                        playSound = true;
+                        notifyOperatorCallIfNew(nc);
                     }
                 }
                 
@@ -686,6 +709,7 @@ async function fetchInitialCalls() {
                 merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 
                 allCalls = merged;
+                isInitialCallsLoaded = true;
             }
             
             const role = sessionStorage.getItem('intercom_user_role');
@@ -769,10 +793,6 @@ async function fetchInitialCalls() {
         }
         
         calculateAICosts(allCalls);
-        
-        if (playSound && !isInitialLoad) {
-            playNotificationSound();
-        }
     } catch (e) {
         console.error("Failed to poll CSV", e);
     }
@@ -796,6 +816,9 @@ async function initDashboard() {
     // Fetch caches independently so they don't block initial calls
     fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e));
     fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e));
+    if (typeof fetchAndRenderSuppliers === 'function') {
+        fetchAndRenderSuppliers().catch(e => console.warn('Suppliers fetch skipped', e));
+    }
     
     await fetchInitialCalls();
     
@@ -809,6 +832,10 @@ async function initDashboard() {
             supabaseClient
               .channel('realtime-calls')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'calls_log' }, payload => {
+                console.log("⚡ Realtime PUSH: calls_log event", payload.eventType);
+                if (typeof pollOperatorCallsFast === 'function') {
+                    pollOperatorCallsFast().catch(e => console.warn(e));
+                }
                 let newCall = payload.new;
                 if (!newCall) return; // handles DELETE where payload.new is null
                 
@@ -829,11 +856,7 @@ async function initDashboard() {
                     newCall.isNew = true;
                     // Add to start of array
                     allCalls.unshift(newCall);
-                    
-                    // Play notification sound ONLY if it's forwarded to the operator
-                    if (String(newCall.is_forwarded).toLowerCase() === 'true') {
-                        playNotificationSound();
-                    }
+                    notifyOperatorCallIfNew(newCall);
                 } else if (payload.eventType === 'UPDATE') {
                     const existingIdx = allCalls.findIndex(c => String(c.id) === String(newCall.id));
                     if (existingIdx !== -1) {
@@ -843,17 +866,15 @@ async function initDashboard() {
                         
                         allCalls[existingIdx] = newCall;
                         
-                        // If it changed from NOT forwarded to forwarded, play the sound!
+                        // If it changed from NOT forwarded to forwarded, notify!
                         if (!wasForwarded && isNowForwarded) {
                             newCall.isNew = true;
-                            playNotificationSound();
+                            notifyOperatorCallIfNew(newCall);
                         }
                     } else {
                         // Not in list yet, treat as insert
                         allCalls.unshift(newCall);
-                        if (String(newCall.is_forwarded).toLowerCase() === 'true') {
-                            playNotificationSound();
-                        }
+                        notifyOperatorCallIfNew(newCall);
                     }
                 }
                 
@@ -865,11 +886,9 @@ async function initDashboard() {
                   console.log("⚡ Supabase Realtime Calls Status:", status);
                   if (status === 'SUBSCRIBED') {
                       window.isRealtimeConnected = true;
-                      // Realtime push active — light 15s safety-net polling (Supabase may not deliver all events)
                       if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(15000);
                   } else {
                       window.isRealtimeConnected = false;
-                      // Realtime down — fast 3s polling fallback
                       if (typeof setAdaptivePollingInterval === 'function') setAdaptivePollingInterval(3000);
                   }
               });
@@ -877,18 +896,38 @@ async function initDashboard() {
             supabaseClient
               .channel('realtime-lists')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'blacklist' }, payload => {
+                  console.log("⚡ Realtime PUSH: blacklist changed", payload.eventType);
                   if (typeof fetchAndRenderActionList === 'function') {
                       fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e));
                   }
               })
               .on('postgres_changes', { event: '*', schema: 'public', table: 'whitelist' }, payload => {
+                  console.log("⚡ Realtime PUSH: whitelist changed", payload.eventType);
                   if (typeof fetchAndRenderActionList === 'function') {
                       fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e));
                   }
               })
-              .subscribe();
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, payload => {
+                  console.log("⚡ Realtime PUSH: suppliers changed", payload.eventType);
+                  if (typeof fetchAndRenderSuppliers === 'function') {
+                      fetchAndRenderSuppliers().catch(e => console.warn('Suppliers fetch skipped', e));
+                  }
+              })
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
+                  console.log("⚡ Realtime PUSH: users changed", payload.eventType);
+                  if (typeof fetchParkingNames === 'function') {
+                      fetchParkingNames().catch(e => console.warn('Parking names fetch skipped', e));
+                  }
+                  if (typeof loadUsers === 'function') {
+                      loadUsers();
+                  }
+              })
+              .subscribe((status) => {
+                  console.log("⚡ Supabase Realtime push status:", status);
+              });
               
-            console.log("Supabase Realtime connected for calls and lists!");
+            window.supabaseClient = supabaseClient;
+            console.log("✅ Supabase Realtime Push active across all tables (calls_log, blacklist, whitelist, suppliers, users)!");
         }
     } catch(e) {
         console.error("Failed to setup realtime", e);
@@ -902,6 +941,9 @@ async function initDashboard() {
     
     // Setup owner forms
     setupOwnerListForms();
+    if (typeof setupOwnerSupplierForm === 'function') {
+        setupOwnerSupplierForm();
+    }
     // Initial fetch done at start of initDashboard
 }
 
@@ -977,6 +1019,10 @@ function applyFilters() {
         renderActionList('authorized', cachedAuthorized);
         if (typeof renderOwnerActionList === 'function') renderOwnerActionList('authorized', cachedAuthorized);
     }
+    if (typeof cachedSuppliers !== 'undefined' && cachedSuppliers) {
+        if (typeof renderSupplierList === 'function') renderSupplierList(cachedSuppliers);
+        if (typeof renderOwnerSupplierList === 'function') renderOwnerSupplierList(cachedSuppliers);
+    }
     
     updateTable();
     
@@ -988,6 +1034,9 @@ function applyFilters() {
     if (typeof fetchAndRenderActionList === 'function') {
         fetchAndRenderActionList('blocked').catch(() => []);
         fetchAndRenderActionList('authorized').catch(() => []);
+    }
+    if (typeof fetchAndRenderSuppliers === 'function') {
+        fetchAndRenderSuppliers().catch(() => []);
     }
     
     setTimeout(() => {
@@ -1436,7 +1485,7 @@ function updateRecentCalls() {
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
             let rawPlate = c.plate_number || 'לא ידוע';
-            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש בטבלה למטה" style="cursor: pointer; user-select: text;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1532,7 +1581,7 @@ function updateRecentCalls() {
             }
             const reasonHtml = ` <div class="call-item-reason">${alertHtml}<strong style="color: var(--color-req);">בקשה:</strong> <span style="color: var(--color-desc);">${req}</span><br><strong style="color: var(--color-act);">פעולה:</strong> <span style="color: var(--color-desc);">${act}</span></div>`;
             let rawPlate = c.plate_number || 'לא ידוע';
-            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
+            let plateDisplayCard = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש בטבלה למטה" style="cursor: pointer; user-select: text;">${rawPlate}</span>` : rawPlate;
             if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
                 plateDisplayCard += ` <span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
             }
@@ -1623,6 +1672,54 @@ function triggerSearch() {
     }
     updateTable();
 }
+
+function searchPlateInTable(plateNumber) {
+    if (!plateNumber) return;
+    const cleanPlate = String(plateNumber).replace(/[^0-9a-zA-Z]/g, '').trim();
+    if (!cleanPlate) return;
+    
+    const plateInput = document.getElementById('search-plate') || 
+                       document.getElementById('global-search') || 
+                       document.querySelector('.search-plate-input');
+                       
+    if (plateInput) {
+        plateInput.value = cleanPlate;
+        if (typeof triggerSearch === 'function') {
+            triggerSearch();
+        } else {
+            plateInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+    
+    if (typeof updateTable === 'function') {
+        updateTable();
+    }
+    
+    const targetSection = document.getElementById('search-plate') || 
+                          document.getElementById('calls-table-container') || 
+                          document.getElementById('callsTableBody') ||
+                          document.getElementById('calls-table-body') ||
+                          document.querySelector('.table-wrapper') ||
+                          document.querySelector('.action-table');
+                          
+    if (targetSection) {
+        targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    if (plateInput) {
+        setTimeout(() => {
+            plateInput.focus();
+            plateInput.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+            plateInput.style.borderColor = '#34c759';
+            plateInput.style.boxShadow = '0 0 12px rgba(52, 199, 89, 0.8)';
+            setTimeout(() => {
+                plateInput.style.boxShadow = '';
+                plateInput.style.borderColor = '';
+            }, 1800);
+        }, 300);
+    }
+}
+window.searchPlateInTable = searchPlateInTable;
 
 searchInputs.forEach(input => {
     if(input) {
@@ -1747,42 +1844,6 @@ function updateTable() {
     renderTableRows();
 }
 
-function searchPlateInTable(plateNumber) {
-    if (!plateNumber || plateNumber === '-' || plateNumber === 'לא ידוע') return;
-    const cleanPlate = String(plateNumber).trim();
-    
-    const plateInput = document.getElementById('search-plate') || 
-                       document.querySelector('.search-plate-input') || 
-                       document.querySelector('.adv-search-input') ||
-                       document.getElementById('search-input');
-                       
-    if (plateInput) {
-        plateInput.value = cleanPlate;
-        plateInput.dispatchEvent(new Event('input', { bubbles: true }));
-        plateInput.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        if (typeof applyFilters === 'function') {
-            applyFilters();
-        } else if (typeof triggerSearch === 'function') {
-            triggerSearch();
-        }
-    }
-    
-    const allTabBtn = document.querySelector('button[onclick*="setOwnerListFilter(\'all\'"]');
-    if (allTabBtn && typeof setOwnerListFilter === 'function') {
-        setOwnerListFilter('all', allTabBtn);
-    }
-    
-    const targetSection = document.getElementById('all-calls-container') || 
-                          document.getElementById('search-plate') ||
-                          document.querySelector('.adv-search-input');
-                          
-    if (targetSection) {
-        targetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}
-window.searchPlateInTable = searchPlateInTable;
-
 let currentRenderCount = 25;
 let currentCallsToShow = [];
 
@@ -1810,8 +1871,7 @@ function renderTableRows() {
         
         const tr = document.createElement('tr');
         if (c.isNew) tr.classList.add('new-row-flash');
-        let rawPlate = c.plate_number || '-';
-        let plateDisplay = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
+        let plateDisplay = c.plate_number || '-';
         if (c.repaired_plate && c.repaired_plate !== c.plate_number) {
             plateDisplay += `<br><span style="font-size:0.85em;color:var(--text-muted);font-weight:normal;" title="מספר שהוכתב ע״י הנהג">(הנהג תיקן ל-${c.repaired_plate})</span>`;
         }
@@ -1858,7 +1918,7 @@ function renderTableRows() {
             <td class="desktop-td">${dateStr}</td>
             <td class="desktop-td">${parkingName}</td>
             <td class="desktop-td">${c.lane_id}</td>
-            <td class="desktop-td" style="direction: ltr; text-align: right;">${plateDisplay}</td>
+            <td class="desktop-td" style="direction: ltr; text-align: right; cursor: pointer;" ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לסינון לפי רכב זה">${plateDisplay}</td>
             <td class="desktop-td">${c.driver_name || '-'}${c.driver_phone ? '<br><span style="font-size:0.85em;color:gray;">' + c.driver_phone + '</span>' : ''}</td>
             <td class="desktop-td">${c.call_duration}s</td>
             <td class="desktop-td">${c.request_summary || '-'}</td>
@@ -2409,6 +2469,7 @@ tabButtons.forEach(btn => {
             targetContent.style.display = targetId === 'tab-recent-ai' ? 'block' : 'flex';
             if (targetId === 'tab-blocked') fetchAndRenderActionList('blocked');
             if (targetId === 'tab-authorized') fetchAndRenderActionList('authorized');
+            if (targetId === 'tab-suppliers') fetchAndRenderSuppliers();
         }
     });
 });
@@ -2430,26 +2491,16 @@ window.setAdaptivePollingInterval = setAdaptivePollingInterval;
 function startGlobalPolling() {
     if (globalPollingInterval) clearInterval(globalPollingInterval);
     
-    // Start adaptive polling: 15s if Realtime connected, 3s if not
+    // Default interval: if Realtime WebSocket is active, gentle 15s check. Otherwise 3s fallback.
     const intervalMs = window.isRealtimeConnected ? 15000 : 3000;
     setAdaptivePollingInterval(intervalMs);
     
-    // Background full sync every 2 minutes
     globalPollingInterval = setInterval(() => {
+        // HOVER & SCROLL GUARD for background heavy fetches
         if (window.isListInteractionActive) return;
         
-        if (!document.getElementById('owner-dashboard-marker') && !document.getElementById('admin-dashboard-marker')) {
-            const activeTab = document.querySelector('.tab-btn.active');
-            if (activeTab) {
-                const targetId = activeTab.getAttribute('data-target');
-                if (targetId === 'tab-blocked' || targetId === 'tab-authorized') {
-                    return;
-                }
-            }
-        }
-        
         if (typeof fetchInitialCalls === 'function') fetchInitialCalls().catch(e => console.error(e));
-    }, 120000); // 2 min background sync
+    }, 30000); // 30s background sync
 }
 
 window.scrollGuardTimeout = null;
@@ -2871,6 +2922,241 @@ function setupOwnerListForms() {
     });
 }
 
+// ----------------------------------------------------
+// Suppliers Management Logic
+// ----------------------------------------------------
+let cachedSuppliers = [];
+
+async function fetchAndRenderSuppliers() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/suppliers?v=` + Date.now());
+        let data = await response.json();
+        data = fixApiDates(data);
+        
+        // Filter by permissions and selected parking
+        data = filterDataByAllowedParkings(data);
+        
+        if (currentParkingId !== 'all') {
+            data = data.filter(item => String(item.parking_id) === String(currentParkingId));
+        }
+        
+        window.cachedSuppliers = data;
+        
+        renderSupplierList(data);
+        renderOwnerSupplierList(data);
+    } catch (err) {
+        console.error("Error fetching suppliers list:", err);
+    }
+}
+
+function renderSupplierList(data) {
+    const listEl = document.getElementById('suppliers-list');
+    const searchInput = document.getElementById('search-suppliers-op');
+    if (!listEl) return;
+    
+    let filteredData = data || [];
+    if (searchInput && searchInput.value) {
+        const q = searchInput.value.toLowerCase().trim();
+        filteredData = filteredData.filter(item => 
+            (item.business_name && item.business_name.toLowerCase().includes(q)) ||
+            (item.contact_name && item.contact_name.toLowerCase().includes(q)) ||
+            (item.contact_phone && item.contact_phone.includes(q)) ||
+            (item.notes && item.notes.toLowerCase().includes(q))
+        );
+    }
+    
+    filteredData.sort((a, b) => (b.monthly_count || 0) - (a.monthly_count || 0) || new Date(b.created_at) - new Date(a.created_at));
+    
+    const dataHash = JSON.stringify(filteredData);
+    if (listEl.dataset.lastRender === dataHash) return;
+    
+    const scrollContainer = listEl.parentElement;
+    const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    if (previousScrollTop > 0) return;
+    
+    listEl.dataset.lastRender = dataHash;
+    
+    if (filteredData.length === 0) {
+        listEl.innerHTML = '<li style="text-align:center; padding:10px; color:var(--text-muted);">אין ספקים מוגדרים</li>';
+        return;
+    }
+    
+    listEl.innerHTML = '';
+    
+    filteredData.forEach(item => {
+        const li = document.createElement('li');
+        li.style.background = 'var(--bg-panel)';
+        li.style.padding = '12px';
+        li.style.borderRadius = '8px';
+        li.style.display = 'flex';
+        li.style.flexDirection = 'column';
+        li.style.gap = '6px';
+        li.style.border = '1px solid rgba(255, 149, 0, 0.4)';
+        
+        const parkingName = item.parking_name || getParkingNameById(item.parking_id) || 'כללי';
+        let contactStr = '';
+        if (item.contact_name || item.contact_phone) {
+            contactStr = `<div style="font-size: 0.85rem; color: var(--text-muted);">איש קשר: ${item.contact_name || ''} ${item.contact_phone ? ' | ☎ ' + item.contact_phone : ''}</div>`;
+        }
+        
+        let notesStr = item.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted);">הערות: ${item.notes}</div>` : '';
+        
+        li.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; font-size: 1rem; color: #ff9500;">🏢 ${item.business_name}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">${parkingName}</span>
+            </div>
+            ${contactStr}
+            <div style="display: flex; gap: 15px; font-size: 0.8rem; background: rgba(255, 149, 0, 0.08); padding: 6px 10px; border-radius: 6px; margin-top: 2px;">
+                <span><strong>החודש:</strong> ${item.monthly_count || 0}</span>
+                <span><strong>חודש שעבר:</strong> ${item.last_month_count || 0}</span>
+                <span><strong>מצטבר:</strong> ${item.total_count || 0}</span>
+            </div>
+            ${notesStr}
+        `;
+        listEl.appendChild(li);
+    });
+}
+
+function renderOwnerSupplierList(data) {
+    const listEl = document.getElementById('owner-suppliers-list');
+    const searchInput = document.getElementById('search-suppliers');
+    if (!listEl) return;
+    
+    let filteredData = data || [];
+    if (searchInput && searchInput.value) {
+        const q = searchInput.value.toLowerCase().trim();
+        filteredData = filteredData.filter(item => 
+            (item.business_name && item.business_name.toLowerCase().includes(q)) ||
+            (item.contact_name && item.contact_name.toLowerCase().includes(q)) ||
+            (item.contact_phone && item.contact_phone.includes(q)) ||
+            (item.notes && item.notes.toLowerCase().includes(q))
+        );
+    }
+    
+    filteredData.sort((a, b) => (b.monthly_count || 0) - (a.monthly_count || 0) || new Date(b.created_at) - new Date(a.created_at));
+    
+    const dataHash = JSON.stringify(filteredData);
+    if (listEl.dataset.lastRender === dataHash) return;
+    
+    const scrollContainer = listEl.parentElement;
+    const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    if (previousScrollTop > 0) return;
+    
+    listEl.dataset.lastRender = dataHash;
+    
+    if (filteredData.length === 0) {
+        listEl.innerHTML = '<li style="text-align:center; padding:10px; color:var(--text-muted);">אין ספקים מוגדרים</li>';
+        return;
+    }
+    
+    listEl.innerHTML = '';
+    
+    filteredData.forEach(item => {
+        const li = document.createElement('li');
+        li.style.background = 'var(--bg-panel)';
+        li.style.padding = '12px';
+        li.style.borderRadius = '8px';
+        li.style.display = 'flex';
+        li.style.justifyContent = 'space-between';
+        li.style.alignItems = 'center';
+        li.style.border = '1px solid var(--border-color)';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.style.display = 'flex';
+        infoDiv.style.flexDirection = 'column';
+        infoDiv.style.gap = '4px';
+        infoDiv.style.flex = '1';
+        
+        const parkingName = item.parking_name || getParkingNameById(item.parking_id) || 'כללי';
+        let contactStr = '';
+        if (item.contact_name || item.contact_phone) {
+            contactStr = ` | איש קשר: ${item.contact_name || ''} ${item.contact_phone ? '☎ ' + item.contact_phone : ''}`.trim();
+        }
+        
+        let notesStr = item.notes ? `<span style="font-size: 0.8rem; color: var(--text-muted);">הערות: ${item.notes}</span>` : '';
+        
+        infoDiv.innerHTML = `
+            <div style="font-size: 0.95rem;"><strong>🏢 ${item.business_name}</strong> | ${parkingName}${contactStr}</div>
+            <div style="display: flex; gap: 15px; font-size: 0.8rem; margin-top: 4px; color: #ff9500;">
+                <span><strong>החודש:</strong> ${item.monthly_count || 0}</span>
+                <span><strong>חודש שעבר:</strong> ${item.last_month_count || 0}</span>
+                <span><strong>מצטבר:</strong> ${item.total_count || 0}</span>
+            </div>
+            ${notesStr}
+        `;
+        
+        const actionDiv = document.createElement('div');
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-secondary';
+        removeBtn.innerText = 'הסר';
+        removeBtn.style.padding = '4px 10px';
+        removeBtn.style.fontSize = '0.8rem';
+        removeBtn.style.color = 'var(--accent-red)';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.onclick = async () => {
+            if (confirm(`האם אתה בטוח שברצונך להסיר את הספק "${item.business_name}"?`)) {
+                await fetch(`${API_BASE_URL}/api/suppliers/remove`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: item.id })
+                });
+                fetchAndRenderSuppliers().catch(() => []);
+            }
+        };
+        actionDiv.appendChild(removeBtn);
+        
+        li.appendChild(infoDiv);
+        li.appendChild(actionDiv);
+        listEl.appendChild(li);
+    });
+}
+
+function setupOwnerSupplierForm() {
+    const form = document.getElementById('owner-add-supplier-form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const payload = Object.fromEntries(formData.entries());
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/suppliers/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res.ok) {
+                    form.reset();
+                    fetchAndRenderSuppliers().catch(() => []);
+                } else {
+                    const err = await res.text();
+                    alert("שגיאה בהוספת ספק: " + err);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("שגיאת רשת");
+            }
+        });
+    }
+    
+    // Wire search inputs
+    const ownerSearch = document.getElementById('search-suppliers');
+    if (ownerSearch) {
+        ownerSearch.addEventListener('input', () => {
+            renderOwnerSupplierList(window.cachedSuppliers || []);
+        });
+    }
+    
+    const opSearch = document.getElementById('search-suppliers-op');
+    if (opSearch) {
+        opSearch.addEventListener('input', () => {
+            renderSupplierList(window.cachedSuppliers || []);
+        });
+    }
+}
+
 
 // ----------------------------------------------------
 // AI Cost Logic
@@ -2904,7 +3190,7 @@ async function calculateAICosts(calls) {
         return;
     }
     
-    // Sort all calls chronologically to calculate quota correctly
+    // Sort all calls chronologically
     const sortedCalls = [...calls].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     
     const timeframe = timeframeSelect.value;
@@ -2938,16 +3224,14 @@ async function calculateAICosts(calls) {
         }
     }
     
-    // Quota state: parking_id -> { monthKey (YYYY-MM): { usedCalls: 0 } }
-    const usageState = {};
     let totalCostInWindow = 0;
     const aiCallsInWindow = [];
     
-    // Data for graph: day string (YYYY-MM-DD) -> { freeMins: 0, paidCalls: 0 }
+    // Data for graph
     const graphData = {};
     const isHourly = (timeframe === 'today' || timeframe === '24h');
     
-    // Pre-fill graphData with empty slots to ensure they show up in the graph
+    // Pre-fill graphData with empty slots
     if (isHourly) {
         for (let h = 0; h < 24; h++) {
             const hKey = String(h).padStart(2, '0') + ':00';
@@ -2955,12 +3239,9 @@ async function calculateAICosts(calls) {
         }
     } else if (timeframe !== 'all' && startWin.getTime() > 0) {
         let currentDay = new Date(startWin);
-        // Don't pre-fill dates beyond today
         const limitDay = new Date(Math.min(endWin.getTime(), new Date().getTime())); 
         limitDay.setHours(23, 59, 59, 999);
-        
         let loopCount = 0;
-        // Limit to max 365 days to prevent browser freezing just in case
         while (currentDay <= limitDay && loopCount < 366) {
             const dayKey = currentDay.getFullYear() + '-' + String(currentDay.getMonth() + 1).padStart(2, '0') + '-' + String(currentDay.getDate()).padStart(2, '0');
             graphData[dayKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
@@ -2973,74 +3254,107 @@ async function calculateAICosts(calls) {
     const ratePerMinute = rateStr ? parseFloat(rateStr) : 2.20;
     const ratePerSec = ratePerMinute / 60.0;
     
+    // ===== Step 1: Group calls by same plate_number within 5 minutes =====
+    const vehicleGroups = [];
+    const plateGroupMap = {}; // plate -> index of latest open group
+    
     sortedCalls.forEach(c => {
-        // We do NOT filter by currentParkingId for quota counting. Quota is ALWAYS global per owner.
-        // But for display in the graph and list, we will filter later or just track global.
-        
-        const d = new Date(c.created_at);
-        const monthKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        
-        const pid = 'global';
-        if (!usageState[pid]) usageState[pid] = {};
-        if (!usageState[pid][monthKey]) usageState[pid][monthKey] = { usedCalls: 0 };
-        
-        const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
-        const durationSec = parseInt(c.call_duration || 0);
-        
-        let callCost = 0;
-        let consumedFreeCalls = 0;
-        let isPaidCall = false;
-        let currentQuotaCount = 0;
-        
-        if (!isForwarded) {
-            // AI call (successful)
-            const currentUsed = usageState[pid][monthKey].usedCalls;
-            if (currentUsed >= 100) {
-                // Quota exceeded: apply rate logic
-                if (durationSec <= 60) {
-                    callCost = ratePerMinute;
-                } else {
-                    const extraSecs = durationSec - 60;
-                    callCost = ratePerMinute + (extraSecs * ratePerSec);
-                }
-                isPaidCall = true;
-            } else {
-                // Consume from quota (1 call)
-                usageState[pid][monthKey].usedCalls += 1;
-                consumedFreeCalls = 1;
-                currentQuotaCount = usageState[pid][monthKey].usedCalls;
-            }
-        }
-        
-        // Filter by current parking lot if not 'all' for display purposes
+        // Filter by current parking lot if set
         if (typeof currentParkingId !== 'undefined' && currentParkingId !== 'all' && c.parking_id !== currentParkingId) {
             return;
         }
         
-        // Sum within selected time window
-        if (d >= startWin && d <= endWin) {
-            totalCostInWindow += callCost;
-            
-            aiCallsInWindow.push({
-                call: c,
-                isForwarded: isForwarded,
-                cost: callCost,
-                duration: durationSec,
-                isPaidCall: isPaidCall,
-                currentQuotaCount: currentQuotaCount
-            });
-            
-            let plotKey = dayKey;
-            if (isHourly) {
-                plotKey = String(d.getHours()).padStart(2, '0') + ':00';
+        const plate = c.plate_number || '';
+        const callTime = new Date(c.created_at).getTime();
+        const durationSec = parseInt(c.call_duration || 0);
+        const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+        
+        let foundGroup = null;
+        if (plate && plateGroupMap[plate] !== undefined) {
+            const gi = plateGroupMap[plate];
+            if (callTime - vehicleGroups[gi].lastTime <= 5 * 60 * 1000) {
+                foundGroup = gi;
             }
-            
-            if (!graphData[plotKey]) graphData[plotKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
-            graphData[plotKey].freeCalls += consumedFreeCalls;
-            if (isPaidCall) graphData[plotKey].paidCalls += 1;
-            graphData[plotKey].cost += callCost;
         }
+        
+        if (foundGroup !== null) {
+            vehicleGroups[foundGroup].calls.push(c);
+            vehicleGroups[foundGroup].lastTime = Math.max(vehicleGroups[foundGroup].lastTime, callTime);
+            vehicleGroups[foundGroup].totalDuration += durationSec;
+            if (!isForwarded) vehicleGroups[foundGroup].hasAI = true;
+            if (isForwarded) vehicleGroups[foundGroup].hasForwarded = true;
+        } else {
+            const idx = vehicleGroups.length;
+            vehicleGroups.push({
+                plate,
+                calls: [c],
+                firstTime: callTime,
+                lastTime: callTime,
+                totalDuration: durationSec,
+                hasAI: !isForwarded,
+                hasForwarded: isForwarded
+            });
+            if (plate) plateGroupMap[plate] = idx;
+        }
+    });
+    
+    // ===== Step 2: Calculate cost per group =====
+    vehicleGroups.forEach(group => {
+        const totalDur = group.totalDuration;
+        let groupCost = 0;
+        
+        if (totalDur <= 60) {
+            groupCost = ratePerMinute;
+        } else {
+            groupCost = ratePerMinute + ((totalDur - 60) * ratePerSec);
+        }
+        
+        // If ALL calls in group are forwarded (no AI), charge 50%
+        const onlyForwarded = group.hasForwarded && !group.hasAI;
+        if (onlyForwarded) groupCost *= 0.5;
+        
+        // Distribute cost to each call in the group (first call gets cost, rest get 0)
+        const firstCallInGroup = group.calls[0];
+        const firstCallTime = new Date(firstCallInGroup.created_at);
+        const isInWindow = firstCallTime >= startWin && firstCallTime <= endWin;
+        
+        group.calls.forEach((c, idx) => {
+            const d = new Date(c.created_at);
+            const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+            const durationSec = parseInt(c.call_duration || 0);
+            
+            // First call in group carries the cost; others show as grouped (0 cost)
+            const callCost = (idx === 0) ? groupCost : 0;
+            const isGrouped = group.calls.length > 1;
+            
+            if (d >= startWin && d <= endWin) {
+                if (idx === 0) totalCostInWindow += groupCost;
+                
+                aiCallsInWindow.push({
+                    call: c,
+                    isForwarded: isForwarded,
+                    cost: callCost,
+                    duration: durationSec,
+                    isPaidCall: true,
+                    isGrouped: isGrouped,
+                    groupTotalDuration: (idx === 0 && isGrouped) ? group.totalDuration : null,
+                    groupCallCount: (idx === 0 && isGrouped) ? group.calls.length : null,
+                    onlyForwarded: onlyForwarded
+                });
+                
+                let plotKey = dayKey;
+                if (isHourly) {
+                    plotKey = String(d.getHours()).padStart(2, '0') + ':00';
+                }
+                
+                if (!graphData[plotKey]) graphData[plotKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+                if (idx === 0) {
+                    graphData[plotKey].paidCalls += 1;
+                    graphData[plotKey].cost += groupCost;
+                }
+            }
+        });
     });
     
     if (window.animateValue) {
@@ -3050,25 +3364,17 @@ async function calculateAICosts(calls) {
         displayEl.innerHTML = totalCostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '&nbsp;₪';
     }
     
-    // Update Quota Display based on the latest month in the window for the selected parking lot (or all)
+    // Update total calls display (no more quota)
     const quotaDisplay = document.getElementById('ai-quota-display');
     if (quotaDisplay) {
-        let currentMonthKey = maxD.getFullYear() + '-' + String(maxD.getMonth() + 1).padStart(2, '0');
-        let totalUsedInMonth = 0;
-        
-        if (usageState['global'] && usageState['global'][currentMonthKey]) {
-            totalUsedInMonth = usageState['global'][currentMonthKey].usedCalls;
-        }
-        
         const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
         const mName = monthNames[maxD.getMonth()];
-        const displayTotal = Math.min(totalUsedInMonth, 100);
-        quotaDisplay.innerText = `${displayTotal} / 100 שיחות (${mName})`;
-        if (totalUsedInMonth >= 100) {
-            quotaDisplay.style.color = 'var(--accent-red)';
-        } else {
-            quotaDisplay.style.color = 'var(--accent-blue)';
-        }
+        const totalCallsInMonth = sortedCalls.filter(c => {
+            const d = new Date(c.created_at);
+            return d.getMonth() === maxD.getMonth() && d.getFullYear() === maxD.getFullYear();
+        }).length;
+        quotaDisplay.innerText = `${totalCallsInMonth} שיחות (${mName})`;
+        quotaDisplay.style.color = 'var(--accent-blue)';
     }
     
     aiCallsInWindow.sort((a, b) => new Date(b.call.created_at) - new Date(a.call.created_at));
@@ -3107,22 +3413,23 @@ window.renderAICostList = function(callsList) {
         const dateStr = d.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
         
         let statusHtml = '';
+        const costText = item.cost > 0 ? `${item.cost.toFixed(2)} ₪` : '0 ₪';
+        const groupInfo = item.isGrouped && item.groupCallCount ? ` (${item.groupCallCount} שיחות, סה"כ ${item.groupTotalDuration} שנ')` : '';
+        
         if (item.isForwarded) {
+            const discountNote = item.onlyForwarded ? ' (50%)' : '';
             if (filterValue !== 'op') {
-                statusHtml = '<span style="color: var(--accent-blue); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(10,132,255,0.1); border-radius: 12px;">טופל ע"י מוקד אנושי</span>';
+                statusHtml = `<span style="color: var(--accent-blue); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(10,132,255,0.1); border-radius: 12px;">טופל ע"י מוקד${discountNote} - ${item.duration} שנ' - ${costText}${groupInfo}</span>`;
             }
         } else {
-            const costText = item.cost > 0 ? `${item.cost.toFixed(2)} ₪` : '0 ₪';
-            const chargedText = item.isPaidCall ? '(חויב)' : `(לא חויב ${item.currentQuotaCount}/100)`;
             if (filterValue === 'ai') {
-                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">${chargedText} - ${item.duration} שנ' - ${costText}</span>`;
+                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">${item.duration} שנ' - ${costText}${groupInfo}</span>`;
             } else {
-                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">טופל ע"י AI ${chargedText} - ${item.duration} שנ' - ${costText}</span>`;
+                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">טופל ע"י AI - ${item.duration} שנ' - ${costText}${groupInfo}</span>`;
             }
         }
         
-        const rawPlate = c.plate_number || 'לא ידוע';
-        const plate = c.plate_number ? `<span ondblclick="searchPlateInTable('${c.plate_number}')" title="לחץ פעמיים לחיפוש היסטוריית רכב" style="cursor: pointer; user-select: text; text-decoration: underline dotted;">${rawPlate}</span>` : rawPlate;
+        const plate = c.plate_number || 'לא ידוע';
         const flashClass = c.isNew ? 'new-row-flash' : '';
         
         const parkingName = c.parking_name || getParkingNameById(c.parking_id) || 'כללי';
@@ -3685,6 +3992,7 @@ function switchMobileView(viewClass, btnText) {
         'show-ai-calls',
         'show-rules-white', 
         'show-rules-black', 
+        'show-suppliers',
         'show-all-calls', 
         'show-load-graph',
         'show-print'
@@ -3855,40 +4163,4 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
     }
-    startSessionMonitor();
 });
-
-function startSessionMonitor() {
-    if (window._sessionMonitorInterval) return;
-    
-    const checkSession = async () => {
-        const username = sessionStorage.getItem('username');
-        const authToken = sessionStorage.getItem('intercom_auth_token');
-        
-        if (username && authToken) {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/check_session`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username, auth_token: authToken })
-                });
-                
-                if (res.status === 401) {
-                    const data = await res.json();
-                    alert(data.error || "החיבור נותק, אנא התחבר מחדש");
-                    sessionStorage.clear();
-                    if (window.location.pathname.includes('dashboard')) {
-                        window.location.href = 'index.html';
-                    } else {
-                        location.reload();
-                    }
-                }
-            } catch (err) {
-                console.error("Session check error:", err);
-            }
-        }
-    };
-
-    checkSession();
-    window._sessionMonitorInterval = setInterval(checkSession, 15000);
-}
