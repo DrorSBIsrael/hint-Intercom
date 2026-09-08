@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smarter Intercom Dashboard</title>
-    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=4.0.1">
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=4.0.2">
     <!-- External fonts removed for offline support; using system fonts instead -->
     <script src="supabase.js"></script>
     
@@ -161,7 +161,7 @@
 
 
         <main class="dashboard-content">
-            <img src="background.png" class="mobile-home-bg" alt="Home Background">
+            <img src="background.png" class="mobile-home-bg" alt="Home Background" onerror="if(!this.dataset.triedWebp){this.dataset.triedWebp='1';this.src='background.webp';}else if(!this.dataset.triedJpg){this.dataset.triedJpg='1';this.src='background.jpg';}">
             
             <!-- Stats Controls -->
             <div class="stats-controls" style="position: relative; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">

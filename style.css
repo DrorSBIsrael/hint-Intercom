@@ -1512,8 +1512,8 @@ html[dir="ltr"] .recent-split .operator-panel {
             font-size: 1rem;
         }
 
-    #login-screen { flex-direction: column; }
-        .stats-grid { grid-template-columns: 1fr; }
+    /* #login-screen display and positioning handled above in Mobile adjustments */
+    .stats-grid { grid-template-columns: 1fr; }
         .global-clock { position: static; text-align: center; margin-bottom: 10px; background: transparent; color: var(--text-main); }
         .dashboard-header { flex-direction: column; align-items: stretch; gap: 10px; }
         .header-left, .header-right { justify-content: space-between; }
@@ -1550,12 +1550,12 @@ html[dir="ltr"] .recent-split .operator-panel {
         }
     
         /* Ensure the screen takes exactly full height to stretch the background */
-        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) #dashboard-screen {
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-suppliers):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) #dashboard-screen {
             height: 100vh !important;
             overflow: hidden !important;
         }
     
-        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .mobile-home-bg {
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-suppliers):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .mobile-home-bg {
             display: block !important;
             position: absolute !important;
             top: -20px !important; /* Pull up further to ensure no gap */
@@ -1569,7 +1569,7 @@ html[dir="ltr"] .recent-split .operator-panel {
             z-index: 0;
         }
         
-        body:not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content {
+        body:not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-suppliers):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content {
             padding: 0 !important;
             margin: 0 !important;
             position: relative !important;
@@ -1578,7 +1578,7 @@ html[dir="ltr"] .recent-split .operator-panel {
         }
 
         /* Hide stats-controls when on the mobile home screen to avoid duplications */
-        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content > .stats-controls {
+        body:not(.admin-page):not(.show-stats):not(.show-ai-cost):not(.show-live-calls):not(.show-rules-white):not(.show-rules-black):not(.show-suppliers):not(.show-all-calls):not(.show-load-graph):not(.show-print):not(.show-ai-calls):not(.show-recent-calls) .dashboard-content > .stats-controls {
             display: none !important;
         }
         
