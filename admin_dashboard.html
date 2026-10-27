@@ -398,8 +398,8 @@
                     <thead>
                         <tr>
                             <th data-i18n="finance_col_group">שם קבוצה (Owner)</th>
-                            <th data-i18n="finance_col_ai_total">שיחות AI</th>
-                            <th>שיחות מוקד</th>
+                            <th>שיחות AI (עלות)</th>
+                            <th>שיחות מוקד (עלות)</th>
                             <th>סה"כ זמן דיבור</th>
                             <th data-i18n="finance_col_rate">תעריף לדקה</th>
                             <th data-i18n="finance_col_cost">סה"כ עלות (₪)</th>
@@ -422,10 +422,10 @@
                         <thead>
                             <tr>
                                 <th>שם חניון</th>
-                                <th>שיחות AI</th>
-                                <th>שיחות מוקד</th>
+                                <th>שיחות AI (עלות)</th>
+                                <th>שיחות מוקד (עלות)</th>
                                 <th>סה"כ זמן דיבור</th>
-                                <th data-i18n="finance_col_cost_nis">עלות (₪)</th>
+                                <th data-i18n="finance_col_cost_nis">סה"כ עלות (₪)</th>
                             </tr>
                         </thead>
                         <tbody id="financeDetailsBody">
@@ -1007,7 +1007,7 @@
                 const pId = u.parking_id;
                 
                 if (!groups[gName]) {
-                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
+                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 
                 if (u.user_type === 'admin' || u.user_type === 'manager') {
@@ -1018,7 +1018,7 @@
                     parkingToGroup[pId] = gName;
                     parkingNames[pId] = u.parking_name || pId;
                     if (!groups[gName].parkings[pId]) {
-                        groups[gName].parkings[pId] = { name: parkingNames[pId], aiCalls: 0, opCalls: 0, durationSec: 0, cost: 0 };
+                        groups[gName].parkings[pId] = { name: parkingNames[pId], aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
                     }
                 }
             });
@@ -1106,10 +1106,10 @@
                 const gName = parkingToGroup[pId] || t('no_group');
                 
                 if (!groups[gName]) {
-                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
+                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 if (!groups[gName].parkings[pId]) {
-                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, aiCalls: 0, opCalls: 0, durationSec: 0, cost: 0 };
+                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
                 }
                 
                 const ratePerMin = groups[gName].rate;
@@ -1126,7 +1126,9 @@
                         // AI call: charged by actual seconds
                         cost = durationSec * ratePerSec;
                         groups[gName].aiCalls++;
+                        groups[gName].aiCost += cost;
                         groups[gName].parkings[pId].aiCalls++;
+                        groups[gName].parkings[pId].aiCost += cost;
                     } else {
                         groups[gName].opCalls++;
                         groups[gName].parkings[pId].opCalls++;
@@ -1138,6 +1140,8 @@
                             // Forwarded after AI in 5-min window or repeat within 5 min: 0 cost
                             cost = 0;
                         }
+                        groups[gName].opCost += cost;
+                        groups[gName].parkings[pId].opCost += cost;
                     }
                     
                     groups[gName].totalDurationSec += durationSec;
@@ -1178,8 +1182,8 @@
                 htmlContent += `
                     <tr>
                         <td><strong>${gName}</strong></td>
-                        <td style="color: var(--accent-green); font-weight:bold;">${g.aiCalls}</td>
-                        <td style="color: var(--accent-blue); font-weight:bold;">${g.opCalls}</td>
+                        <td style="color: var(--accent-green); font-weight:bold;">${g.aiCalls} <span style="font-size:0.85em;">(${g.aiCost.toFixed(2)} ₪)</span></td>
+                        <td style="color: var(--accent-blue); font-weight:bold;">${g.opCalls} <span style="font-size:0.85em;">(${g.opCost.toFixed(2)} ₪)</span></td>
                         <td>${formatSecondsToDuration(g.totalDurationSec)}</td>
                         <td>${g.rate.toFixed(2)} ₪</td>
                         <td style="font-weight: bold; color: ${g.totalCost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${g.totalCost.toFixed(2)} ₪</td>
@@ -1220,8 +1224,8 @@
                 htmlContent += `
                     <tr>
                         <td><strong>${p.name}</strong> <span style="color: gray; font-size: 0.8em;">(${pId})</span></td>
-                        <td style="color: var(--accent-green); font-weight:bold;">${p.aiCalls}</td>
-                        <td style="color: var(--accent-blue); font-weight:bold;">${p.opCalls}</td>
+                        <td style="color: var(--accent-green); font-weight:bold;">${p.aiCalls} <span style="font-size:0.85em;">(${p.aiCost.toFixed(2)} ₪)</span></td>
+                        <td style="color: var(--accent-blue); font-weight:bold;">${p.opCalls} <span style="font-size:0.85em;">(${p.opCost.toFixed(2)} ₪)</span></td>
                         <td>${formatSecondsToDuration(p.durationSec)}</td>
                         <td style="font-weight: bold; color: ${p.cost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${p.cost.toFixed(2)} ₪</td>
                     </tr>

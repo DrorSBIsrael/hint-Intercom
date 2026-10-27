@@ -3316,6 +3316,8 @@ async function calculateAICosts(calls) {
     }
     
     let totalCostInWindow = 0;
+    let totalAICostInWindow = 0;
+    let totalOpCostInWindow = 0;
     const aiCallsInWindow = [];
     
     // Data for graph
@@ -3326,7 +3328,7 @@ async function calculateAICosts(calls) {
     if (isHourly) {
         for (let h = 0; h < 24; h++) {
             const hKey = String(h).padStart(2, '0') + ':00';
-            graphData[hKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+            graphData[hKey] = { opCalls: 0, aiCalls: 0, opCost: 0, aiCost: 0, cost: 0 };
         }
     } else if (timeframe !== 'all' && startWin.getTime() > 0) {
         let currentDay = new Date(startWin);
@@ -3335,7 +3337,7 @@ async function calculateAICosts(calls) {
         let loopCount = 0;
         while (currentDay <= limitDay && loopCount < 366) {
             const dayKey = currentDay.getFullYear() + '-' + String(currentDay.getMonth() + 1).padStart(2, '0') + '-' + String(currentDay.getDate()).padStart(2, '0');
-            graphData[dayKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
+            graphData[dayKey] = { opCalls: 0, aiCalls: 0, opCost: 0, aiCost: 0, cost: 0 };
             currentDay.setDate(currentDay.getDate() + 1);
             loopCount++;
         }
@@ -3402,7 +3404,7 @@ async function calculateAICosts(calls) {
         const isGrouped = group.calls.length > 1;
         let firstForwardedCharged = false;
         
-        group.calls.forEach((c, idx) => {
+        group.calls.forEach((c) => {
             const d = new Date(c.created_at);
             const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
@@ -3423,6 +3425,11 @@ async function calculateAICosts(calls) {
             
             if (d >= startWin && d <= endWin) {
                 totalCostInWindow += callCost;
+                if (!isForwarded) {
+                    totalAICostInWindow += callCost;
+                } else {
+                    totalOpCostInWindow += callCost;
+                }
                 
                 aiCallsInWindow.push({
                     call: c,
@@ -3431,8 +3438,6 @@ async function calculateAICosts(calls) {
                     duration: durationSec,
                     isPaidCall: callCost > 0,
                     isGrouped: isGrouped,
-                    groupTotalDuration: isGrouped ? group.totalDuration : null,
-                    groupCallCount: isGrouped ? group.calls.length : null,
                     onlyForwarded: onlyForwarded && isForwarded
                 });
                 
@@ -3441,13 +3446,15 @@ async function calculateAICosts(calls) {
                     plotKey = String(d.getHours()).padStart(2, '0') + ':00';
                 }
                 
-                if (!graphData[plotKey]) graphData[plotKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
-                if (callCost > 0) {
-                    graphData[plotKey].paidCalls += 1;
-                    graphData[plotKey].cost += callCost;
+                if (!graphData[plotKey]) graphData[plotKey] = { opCalls: 0, aiCalls: 0, opCost: 0, aiCost: 0, cost: 0 };
+                if (!isForwarded) {
+                    graphData[plotKey].aiCalls += 1;
+                    graphData[plotKey].aiCost += callCost;
                 } else {
-                    graphData[plotKey].freeCalls += 1;
+                    graphData[plotKey].opCalls += 1;
+                    graphData[plotKey].opCost += callCost;
                 }
+                graphData[plotKey].cost += callCost;
             }
         });
     });
@@ -3459,17 +3466,12 @@ async function calculateAICosts(calls) {
         displayEl.innerHTML = totalCostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '&nbsp;₪';
     }
     
-    // Update total calls display (no more quota)
+    // Update AI vs Operator cost breakdown (replacing old quota text)
     const quotaDisplay = document.getElementById('ai-quota-display');
     if (quotaDisplay) {
-        const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
-        const mName = monthNames[maxD.getMonth()];
-        const totalCallsInMonth = sortedCalls.filter(c => {
-            const d = new Date(c.created_at);
-            return d.getMonth() === maxD.getMonth() && d.getFullYear() === maxD.getFullYear();
-        }).length;
-        quotaDisplay.innerText = `${totalCallsInMonth} שיחות (${mName})`;
-        quotaDisplay.style.color = 'var(--accent-blue)';
+        const aiFmt = totalAICostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₪';
+        const opFmt = totalOpCostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₪';
+        quotaDisplay.innerHTML = `<span>עלות שיחות AI: <strong id="ai-only-cost-display" style="color: var(--accent-green);">${aiFmt}</strong></span> <span style="margin: 0 6px;">|</span> <span>עלות שיחות שעברו למוקד: <strong id="op-only-cost-display" style="color: var(--accent-blue);">${opFmt}</strong></span>`;
     }
     
     aiCallsInWindow.sort((a, b) => new Date(b.call.created_at) - new Date(a.call.created_at));
@@ -3509,18 +3511,19 @@ window.renderAICostList = function(callsList) {
         
         let statusHtml = '';
         const costText = item.cost > 0 ? `${item.cost.toFixed(2)} ₪` : '0 ₪';
-        const groupInfo = item.isGrouped && item.groupCallCount ? ` (${item.groupCallCount} שיחות, סה"כ ${item.groupTotalDuration} שנ')` : '';
         
         if (item.isForwarded) {
-            const discountNote = item.onlyForwarded ? ' (50%)' : '';
-            if (filterValue !== 'op') {
-                statusHtml = `<span style="color: var(--accent-blue); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(10,132,255,0.1); border-radius: 12px;">טופל ע"י מוקד${discountNote} - ${item.duration} שנ' - ${costText}${groupInfo}</span>`;
+            const discountNote = (item.onlyForwarded && item.cost > 0) ? ' (50%)' : '';
+            if (filterValue === 'op') {
+                statusHtml = `<span style="color: var(--accent-blue); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(10,132,255,0.1); border-radius: 12px;">${item.duration} שנ' - ${costText}${discountNote}</span>`;
+            } else {
+                statusHtml = `<span style="color: var(--accent-blue); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(10,132,255,0.1); border-radius: 12px;">טופל ע"י מוקד${discountNote} - ${item.duration} שנ' - ${costText}</span>`;
             }
         } else {
             if (filterValue === 'ai') {
-                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">${item.duration} שנ' - ${costText}${groupInfo}</span>`;
+                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">${item.duration} שנ' - ${costText}</span>`;
             } else {
-                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">טופל ע"י AI - ${item.duration} שנ' - ${costText}${groupInfo}</span>`;
+                statusHtml = `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: bold; padding: 2px 8px; background: rgba(48,209,88,0.1); border-radius: 12px;">טופל ע"י AI - ${item.duration} שנ' - ${costText}</span>`;
             }
         }
         
@@ -3589,8 +3592,9 @@ function renderAICostGraph(graphData) {
         return;
     }
     
-    const maxFree = Math.max(...days.map(d => graphData[d].freeCalls), 10);
-    const maxPaid = Math.max(...days.map(d => graphData[d].paidCalls), 5);
+    const maxOp = Math.max(...days.map(d => graphData[d].opCalls || 0), 5);
+    const maxAI = Math.max(...days.map(d => graphData[d].aiCalls || 0), 5);
+    const maxScale = Math.max(maxOp, maxAI, 5);
     
     const chartWrapper = document.createElement('div');
     chartWrapper.style.display = 'flex';
@@ -3604,6 +3608,10 @@ function renderAICostGraph(graphData) {
     
     days.forEach(day => {
         const data = graphData[day];
+        const opCalls = data.opCalls || 0;
+        const aiCalls = data.aiCalls || 0;
+        const opCost = data.opCost || 0;
+        const aiCost = data.aiCost || 0;
         
         const col = document.createElement('div');
         col.style.display = 'flex';
@@ -3623,24 +3631,24 @@ function renderAICostGraph(graphData) {
         barsContainer.style.width = '100%';
         barsContainer.style.height = '100%';
         
-        const freeH = (data.freeCalls / maxFree) * 100;
-        const paidH = (data.paidCalls / maxPaid) * 100;
+        const opH = (opCalls / maxScale) * 100;
+        const aiH = (aiCalls / maxScale) * 100;
         
-        const freeBar = document.createElement('div');
-        freeBar.style.width = '14px';
-        freeBar.style.background = 'var(--accent-blue)';
-        freeBar.style.borderRadius = '3px 3px 0 0';
-        freeBar.style.transition = 'height 0.5s ease';
-        if (data.freeCalls === 0) freeBar.style.display = 'none';
-        else freeBar.style.height = `${Math.max(freeH, 2)}%`;
+        const opBar = document.createElement('div');
+        opBar.style.width = '14px';
+        opBar.style.background = 'var(--accent-blue)';
+        opBar.style.borderRadius = '3px 3px 0 0';
+        opBar.style.transition = 'height 0.5s ease';
+        if (opCalls === 0) opBar.style.display = 'none';
+        else opBar.style.height = `${Math.max(opH, 2)}%`;
         
-        const paidBar = document.createElement('div');
-        paidBar.style.width = '14px';
-        paidBar.style.background = 'var(--accent-red)';
-        paidBar.style.borderRadius = '3px 3px 0 0';
-        paidBar.style.transition = 'height 0.5s ease';
-        if (data.paidCalls === 0) paidBar.style.display = 'none';
-        else paidBar.style.height = `${Math.max(paidH, 2)}%`;
+        const aiBar = document.createElement('div');
+        aiBar.style.width = '14px';
+        aiBar.style.background = 'var(--accent-red)';
+        aiBar.style.borderRadius = '3px 3px 0 0';
+        aiBar.style.transition = 'height 0.5s ease';
+        if (aiCalls === 0) aiBar.style.display = 'none';
+        else aiBar.style.height = `${Math.max(aiH, 2)}%`;
         
         let labelDisplay = '';
         let titleDisplay = '';
@@ -3653,9 +3661,9 @@ function renderAICostGraph(graphData) {
             titleDisplay = labelDisplay;
         }
         
-        const costStr = data.cost > 0 ? `<br/>עלות: ${data.cost.toFixed(2)} ₪` : '';
+        const costStr = data.cost > 0 ? `<br/>סה"כ עלות: ${data.cost.toFixed(2)} ₪` : '';
         const tooltip = document.createElement('div');
-        tooltip.innerHTML = `<strong>${titleDisplay}</strong><br/>במכסה: ${data.freeCalls}<br/>שיחות AI: ${data.paidCalls}${costStr}`;
+        tooltip.innerHTML = `<strong>${titleDisplay}</strong><br/>שיחות AI: ${aiCalls} (${aiCost.toFixed(2)} ₪)<br/>שיחות מוקד: ${opCalls} (${opCost.toFixed(2)} ₪)${costStr}`;
         tooltip.style.position = 'absolute';
         tooltip.style.top = '5px';
         tooltip.style.left = '50%';
@@ -3686,8 +3694,8 @@ function renderAICostGraph(graphData) {
             col.style.background = 'transparent';
         });
         
-        barsContainer.appendChild(freeBar);
-        barsContainer.appendChild(paidBar);
+        barsContainer.appendChild(opBar);
+        barsContainer.appendChild(aiBar);
         col.appendChild(tooltip);
         
         const label = document.createElement('div');
@@ -3842,11 +3850,11 @@ window.printAICost = function() {
     let html = '<html><head><title>דוח עלויות AI</title>';
     html += '<style>body { font-family: sans-serif; direction: rtl; padding: 20px; } table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: right; } th { background-color: #f2f2f2; } .summary { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; margin-bottom: 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; } .summary-left { display: flex; flex-direction: column; } .summary-title { font-size: 1.2rem; color: #555; } .summary-quota { font-size: 1rem; color: #555; margin-top: 5px; } .summary-cost { font-size: 2.5rem; font-weight: bold; color: #28a745; direction: ltr; }</style>';
     html += '</head><body>';
-    html += '<h2>דוח עלויות AI</h2>';
+    html += '<h2>דוח עלויות AI ומוקד</h2>';
     html += '<div class="summary">';
     html += '  <div class="summary-left">';
     html += '    <span class="summary-title">סה"כ עלות לתקופה:</span>';
-    html += '    <div class="summary-quota">מכסה חודשית מנוצלת: <strong style="color: #007bff;">' + (quotaEl ? quotaEl.innerText : '0') + '</strong></div>';
+    html += '    <div class="summary-quota">' + (quotaEl ? quotaEl.innerText : '') + '</div>';
     html += '  </div>';
     html += '  <div class="summary-cost">' + (totalEl ? totalEl.innerText : '0') + '</div>';
     html += '</div>';

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smarter Intercom Dashboard</title>
-    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=4.0.2">
+    <link id="theme-stylesheet" rel="stylesheet" href="style.css?v=4.0.1">
     <!-- External fonts removed for offline support; using system fonts instead -->
     <script src="supabase.js"></script>
     
@@ -161,7 +161,7 @@
 
 
         <main class="dashboard-content">
-            <img src="background.png" class="mobile-home-bg" alt="Home Background" onerror="if(!this.dataset.triedWebp){this.dataset.triedWebp='1';this.src='background.webp';}else if(!this.dataset.triedJpg){this.dataset.triedJpg='1';this.src='background.jpg';}">
+            <img src="background.png" class="mobile-home-bg" alt="Home Background">
             
             <!-- Stats Controls -->
             <div class="stats-controls" style="position: relative; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -265,7 +265,7 @@
                         </select>
                     </div>
                     <div class="chart-legend" style="display:flex; gap: 16px; margin-left: auto; margin-right: 20px; font-size: 0.9rem;">
-                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-blue); border-radius:2px; margin-left:6px;"></span>שיחות במכסה</div>
+                        <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-blue); border-radius:2px; margin-left:6px;"></span>שיחות שעברו למוקד</div>
                         <div style="display:flex; align-items:center;"><span style="display:inline-block; width:12px; height:12px; background:var(--accent-red); border-radius:2px; margin-left:6px;"></span>שיחות AI</div>
                     </div>
                 </div>
@@ -278,8 +278,10 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 10px;">
                             <div style="display: flex; flex-direction: column;">
                                 <span style="font-size: 1.1rem; color: var(--text-muted);">סה"כ עלות לתקופה:</span>
-                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-                                    מכסה חודשית מנוצלת: <strong id="ai-quota-display" style="color: var(--accent-blue);">0 / 100 שיחות</strong>
+                                <div id="ai-quota-display" style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px; display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <span>עלות שיחות AI: <strong id="ai-only-cost-display" style="color: var(--accent-green);">0.00 ₪</strong></span>
+                                    <span>|</span>
+                                    <span>עלות שיחות שעברו למוקד: <strong id="op-only-cost-display" style="color: var(--accent-blue);">0.00 ₪</strong></span>
                                 </div>
                             </div>
                             <span id="ai-cost-display" style="font-size: 2.2rem; font-weight: bold; color: var(--accent-green);">0 ₪</span>
