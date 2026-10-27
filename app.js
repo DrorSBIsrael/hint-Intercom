@@ -38,6 +38,27 @@ const API_BASE_URL = (window.location.hostname === 'localhost' || window.locatio
     ? (window.location.port ? `http://${window.location.hostname}:${window.location.port}` : 'http://localhost:8080') 
     : (window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:8080' : 'https://hint-intercom-backend.onrender.com');
 
+// Automatically attach session token to same-API requests
+(function attachAuthHeaderInterceptor() {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = function(input, init = {}) {
+        const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+        const token = sessionStorage.getItem('intercom_session_token');
+        if (token && (url.startsWith(API_BASE_URL) || url.startsWith('/api/') || url.startsWith('/config'))) {
+            init = Object.assign({}, init);
+            const headers = new Headers(init.headers || {});
+            if (!headers.has('Authorization')) {
+                headers.set('Authorization', `Bearer ${token}`);
+            }
+            if (!headers.has('X-Session-Token')) {
+                headers.set('X-Session-Token', token);
+            }
+            init.headers = headers;
+        }
+        return originalFetch(input, init);
+    };
+})();
+
 let allCalls = [];
 let filteredCalls = [];
 let lastFetchedTime = 0;
@@ -342,16 +363,14 @@ const loginForm = document.getElementById('login-form');
 const loginError = document.getElementById('login-error');
 
 if (loginForm) {
-    // Load remember me
+    // Load remember me (username only for security; remove any legacy plaintext password)
+    localStorage.removeItem('intercom_remember_pass');
     const rememberMeCheck = document.getElementById('remember-me');
     const userField = document.getElementById('username');
-    const passField = document.getElementById('password');
-    if (rememberMeCheck && userField && passField) {
+    if (rememberMeCheck && userField) {
         const savedUser = localStorage.getItem('intercom_remember_user');
-        const savedPass = localStorage.getItem('intercom_remember_pass');
-        if (savedUser && savedPass) {
+        if (savedUser) {
             userField.value = savedUser;
-            passField.value = savedPass;
             rememberMeCheck.checked = true;
         }
     }
@@ -362,8 +381,8 @@ if (loginForm) {
     const pass = document.getElementById('password').value.trim();
     
     // Check pattern explicitly in JS just in case
-    if (!/^[a-zA-Z0-9@]+$/.test(pass)) {
-        loginError.innerText = "הסיסמא יכולה להכיל רק אותיות, מספרים ו-@";
+    if (!/^[a-zA-Z0-9@_\-.]+$/.test(pass)) {
+        loginError.innerText = "הסיסמא יכולה להכיל רק אותיות, מספרים וסימנים @ _ - .";
         return;
     }
 
@@ -384,11 +403,10 @@ if (loginForm) {
             const rememberMe = document.getElementById('remember-me')?.checked;
             if (rememberMe) {
                 localStorage.setItem('intercom_remember_user', user);
-                localStorage.setItem('intercom_remember_pass', pass);
             } else {
                 localStorage.removeItem('intercom_remember_user');
-                localStorage.removeItem('intercom_remember_pass');
             }
+            localStorage.removeItem('intercom_remember_pass');
             
 
             // Move to 2FA
@@ -459,6 +477,8 @@ function checkTwoFaCode() {
                 if (data.role) sessionStorage.setItem('intercom_user_role', data.role);
                 if (data.allowed_parkings) sessionStorage.setItem('intercom_allowed_parkings', JSON.stringify(data.allowed_parkings));
                 if (data.rate_per_minute) sessionStorage.setItem('intercom_rate_per_minute', data.rate_per_minute);
+                sessionStorage.setItem('intercom_login_time', String(Date.now()));
+                sessionStorage.setItem('intercom_last_activity', String(Date.now()));
                 if (data.role === 'admin' || data.role === 'owner' || data.role === 'manager') {
                     window.location.href = 'owner_dashboard.html';
                 } else {
@@ -533,23 +553,94 @@ if (fontSizeSlider) {
     });
 }
 
-document.getElementById('logout-btn').addEventListener('click', () => {
-    // Clear 2FA inputs
+function performLogout(reasonMsg) {
+    const token = sessionStorage.getItem('intercom_session_token');
+    if (token) {
+        fetch(`${API_BASE_URL}/api/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_token: token })
+        }).catch(() => {});
+    }
+
     if (typeof codeInputs !== 'undefined') codeInputs.forEach(i => i.value = '');
     const uname = document.getElementById('username');
-    if (uname) uname.value = '';
+    if (uname && !localStorage.getItem('intercom_remember_user')) uname.value = '';
     const pwd = document.getElementById('password');
     if (pwd) pwd.value = '';
     
     sessionStorage.removeItem('intercom_session_token');
     sessionStorage.removeItem('intercom_user_role');
+    sessionStorage.removeItem('intercom_allowed_parkings');
+    sessionStorage.removeItem('intercom_login_time');
+    sessionStorage.removeItem('intercom_last_activity');
     
-    if (document.getElementById('owner-dashboard-marker')) {
+    if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker') || window.location.pathname.includes('owner_dashboard') || window.location.pathname.includes('admin_dashboard')) {
         window.location.href = 'index.html';
     } else {
         showScreen('login-screen');
+        if (reasonMsg && loginError) {
+            loginError.innerText = reasonMsg;
+        }
     }
+}
+window.performLogout = performLogout;
+
+document.getElementById('logout-btn')?.addEventListener('click', () => {
+    performLogout();
 });
+
+// ----------------------------------------------------
+// Auto-Logout Logic:
+// - Operators ('operator'): daily at 02:00 Israel time
+// - Other users ('admin', 'manager', 'owner'): after 60 minutes of inactivity
+// ----------------------------------------------------
+(function setupSessionAutoLogout() {
+    const INACTIVITY_LIMIT_MS = 60 * 60 * 1000; // 60 minutes
+
+    function updateActivityTimestamp() {
+        if (sessionStorage.getItem('intercom_session_token')) {
+            sessionStorage.setItem('intercom_last_activity', String(Date.now()));
+        }
+    }
+
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(evt => {
+        document.addEventListener(evt, updateActivityTimestamp, { passive: true });
+    });
+
+    // Initialize activity timestamp if session is active
+    if (sessionStorage.getItem('intercom_session_token') && !sessionStorage.getItem('intercom_last_activity')) {
+        sessionStorage.setItem('intercom_last_activity', String(Date.now()));
+    }
+
+    setInterval(() => {
+        const token = sessionStorage.getItem('intercom_session_token');
+        const role = sessionStorage.getItem('intercom_user_role');
+        if (!token && !role) return;
+
+        // If on login screen and not logged in, skip
+        const loginScreen = document.getElementById('login-screen');
+        if (loginScreen && loginScreen.classList.contains('active')) return;
+
+        const now = new Date();
+        if (role === 'operator') {
+            // Check if current Israel time is 02:00
+            const ilTimeStr = now.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false, hour: '2-digit', minute: '2-digit' });
+            const ilDateStr = now.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            const lastDailyLogoutDate = sessionStorage.getItem('intercom_last_0200_logout');
+            if (ilTimeStr.startsWith('02:00') && lastDailyLogoutDate !== ilDateStr) {
+                sessionStorage.setItem('intercom_last_0200_logout', ilDateStr);
+                performLogout("בוצע ניתוק אוטומטי יומי (02:00). אנא התחבר מחדש.");
+            }
+        } else {
+            // Non-operator users: check 60-minute inactivity timeout
+            const lastAct = parseInt(sessionStorage.getItem('intercom_last_activity') || '0', 10);
+            if (lastAct > 0 && (Date.now() - lastAct) >= INACTIVITY_LIMIT_MS) {
+                performLogout("נותקת מהמערכת עקב חוסר פעילות של 60 דקות.");
+            }
+        }
+    }, 10000); // Check every 10 seconds
+})();
 
 // ----------------------------------------------------
 // Dashboard Logic & Data Fetching
@@ -3281,8 +3372,13 @@ async function calculateAICosts(calls) {
             vehicleGroups[foundGroup].calls.push(c);
             vehicleGroups[foundGroup].lastTime = Math.max(vehicleGroups[foundGroup].lastTime, callTime);
             vehicleGroups[foundGroup].totalDuration += durationSec;
-            if (!isForwarded) vehicleGroups[foundGroup].hasAI = true;
-            if (isForwarded) vehicleGroups[foundGroup].hasForwarded = true;
+            if (!isForwarded) {
+                vehicleGroups[foundGroup].hasAI = true;
+                vehicleGroups[foundGroup].aiDuration += durationSec;
+            } else {
+                vehicleGroups[foundGroup].hasForwarded = true;
+                vehicleGroups[foundGroup].opDuration += durationSec;
+            }
         } else {
             const idx = vehicleGroups.length;
             vehicleGroups.push({
@@ -3291,6 +3387,8 @@ async function calculateAICosts(calls) {
                 firstTime: callTime,
                 lastTime: callTime,
                 totalDuration: durationSec,
+                aiDuration: !isForwarded ? durationSec : 0,
+                opDuration: isForwarded ? durationSec : 0,
                 hasAI: !isForwarded,
                 hasForwarded: isForwarded
             });
@@ -3298,25 +3396,11 @@ async function calculateAICosts(calls) {
         }
     });
     
-    // ===== Step 2: Calculate cost per group =====
+    // ===== Step 2: Calculate cost per call / group (per-second billing, no minimum, no quota) =====
     vehicleGroups.forEach(group => {
-        const totalDur = group.totalDuration;
-        let groupCost = 0;
-        
-        if (totalDur <= 60) {
-            groupCost = ratePerMinute;
-        } else {
-            groupCost = ratePerMinute + ((totalDur - 60) * ratePerSec);
-        }
-        
-        // If ALL calls in group are forwarded (no AI), charge 50%
         const onlyForwarded = group.hasForwarded && !group.hasAI;
-        if (onlyForwarded) groupCost *= 0.5;
-        
-        // Distribute cost to each call in the group (first call gets cost, rest get 0)
-        const firstCallInGroup = group.calls[0];
-        const firstCallTime = new Date(firstCallInGroup.created_at);
-        const isInWindow = firstCallTime >= startWin && firstCallTime <= endWin;
+        const isGrouped = group.calls.length > 1;
+        let firstForwardedCharged = false;
         
         group.calls.forEach((c, idx) => {
             const d = new Date(c.created_at);
@@ -3324,23 +3408,32 @@ async function calculateAICosts(calls) {
             const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
             const durationSec = parseInt(c.call_duration || 0);
             
-            // First call in group carries the cost; others show as grouped (0 cost)
-            const callCost = (idx === 0) ? groupCost : 0;
-            const isGrouped = group.calls.length > 1;
+            let callCost = 0;
+            if (!isForwarded) {
+                // AI call: charged normally by actual seconds
+                callCost = durationSec * ratePerSec;
+            } else if (onlyForwarded && !firstForwardedCharged) {
+                // Direct to operator (no AI call in 5-min window): 50% per second on first call, repeat calls within 5 min are free
+                callCost = durationSec * ratePerSec * 0.5;
+                firstForwardedCharged = true;
+            } else {
+                // Forwarded call after/with AI in 5-min window, or repeat forwarded call within 5 min: 0 cost
+                callCost = 0;
+            }
             
             if (d >= startWin && d <= endWin) {
-                if (idx === 0) totalCostInWindow += groupCost;
+                totalCostInWindow += callCost;
                 
                 aiCallsInWindow.push({
                     call: c,
                     isForwarded: isForwarded,
                     cost: callCost,
                     duration: durationSec,
-                    isPaidCall: true,
+                    isPaidCall: callCost > 0,
                     isGrouped: isGrouped,
-                    groupTotalDuration: (idx === 0 && isGrouped) ? group.totalDuration : null,
-                    groupCallCount: (idx === 0 && isGrouped) ? group.calls.length : null,
-                    onlyForwarded: onlyForwarded
+                    groupTotalDuration: isGrouped ? group.totalDuration : null,
+                    groupCallCount: isGrouped ? group.calls.length : null,
+                    onlyForwarded: onlyForwarded && isForwarded
                 });
                 
                 let plotKey = dayKey;
@@ -3349,9 +3442,11 @@ async function calculateAICosts(calls) {
                 }
                 
                 if (!graphData[plotKey]) graphData[plotKey] = { freeCalls: 0, paidCalls: 0, cost: 0 };
-                if (idx === 0) {
+                if (callCost > 0) {
                     graphData[plotKey].paidCalls += 1;
-                    graphData[plotKey].cost += groupCost;
+                    graphData[plotKey].cost += callCost;
+                } else {
+                    graphData[plotKey].freeCalls += 1;
                 }
             }
         });

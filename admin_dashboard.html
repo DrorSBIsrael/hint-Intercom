@@ -398,9 +398,9 @@
                     <thead>
                         <tr>
                             <th data-i18n="finance_col_group">שם קבוצה (Owner)</th>
-                            <th data-i18n="finance_col_ai_total">סה"כ שיחות AI</th>
-                            <th data-i18n="finance_col_quota">במכסה (חינם)</th>
-                            <th data-i18n="finance_col_over">מעבר למכסה (בתשלום)</th>
+                            <th data-i18n="finance_col_ai_total">שיחות AI</th>
+                            <th>שיחות מוקד</th>
+                            <th>סה"כ זמן דיבור</th>
                             <th data-i18n="finance_col_rate">תעריף לדקה</th>
                             <th data-i18n="finance_col_cost">סה"כ עלות (₪)</th>
                             <th data-i18n="col_actions">פעולות</th>
@@ -422,9 +422,9 @@
                         <thead>
                             <tr>
                                 <th>שם חניון</th>
-                                <th data-i18n="finance_col_ai_total">סה"כ שיחות AI</th>
-                                <th data-i18n="finance_col_in_quota">שיחות במכסה</th>
-                                <th data-i18n="finance_col_paid">שיחות בתשלום</th>
+                                <th>שיחות AI</th>
+                                <th>שיחות מוקד</th>
+                                <th>סה"כ זמן דיבור</th>
                                 <th data-i18n="finance_col_cost_nis">עלות (₪)</th>
                             </tr>
                         </thead>
@@ -495,7 +495,9 @@
         // פונקציה שמביאה את המפתחות בצורה מאובטחת מ-Render לפני טעינת הטבלאות
         async function initAdminPanel() {
             try {
-                const LOCAL_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://hint-intercom-backend.onrender.com';
+                const LOCAL_API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                    ? (window.location.port ? `http://${window.location.hostname}:${window.location.port}` : 'http://localhost:8080')
+                    : (window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:8080' : 'https://hint-intercom-backend.onrender.com');
                 const response = await fetch(`${LOCAL_API_BASE}/api/config`);
                 if (!response.ok) throw new Error("Failed to fetch config from Render");
                 
@@ -754,23 +756,51 @@
                 return;
             }
             
+            const sessionToken = sessionStorage.getItem('intercom_session_token');
+            let deletedViaBackend = false;
+            
             try {
-                const { error } = await supabaseClient.from('users').delete().eq('user_id', userId);
-                if (error) {
-                    alert("שגיאה במחיקה: " + (error.message || 'Unknown error'));
-                } else {
-                    alert("המשתמש נמחק בהצלחה! 🗑️");
-                    document.getElementById("u_id").value = "";
-                    document.getElementById("u_username").value = "";
-                    document.getElementById("u_email").value = "";
-                    document.getElementById("u_phone").value = "";
-                    document.getElementById("u_pname").value = "";
-                    document.getElementById("u_pid").value = "";
-                    document.getElementById("u_gname").value = "";
-                    document.getElementById("u_gid").value = 0;
-                    document.getElementById("u_password").value = "";
-                    loadUsers();
+                if (typeof API_BASE_URL !== 'undefined') {
+                    const res = await fetch(`${API_BASE_URL}/api/admin/user/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_token: sessionToken,
+                            user_id: userId
+                        })
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json.success) {
+                            deletedViaBackend = true;
+                        }
+                    }
                 }
+            } catch (apiErr) {
+                console.warn("Backend delete fallback to Supabase client:", apiErr);
+            }
+            
+            try {
+                if (!deletedViaBackend) {
+                    const { error } = await supabaseClient.from('users').delete().eq('user_id', userId);
+                    if (error) {
+                        alert("שגיאה במחיקה: " + (error.message || 'Unknown error'));
+                        return;
+                    }
+                }
+                
+                alert("המשתמש נמחק בהצלחה! 🗑️");
+                currentOriginalUserId = null;
+                document.getElementById("u_id").value = "";
+                document.getElementById("u_username").value = "";
+                document.getElementById("u_email").value = "";
+                document.getElementById("u_phone").value = "";
+                const unifiedParkingEl = document.getElementById("u_unified_parking");
+                if (unifiedParkingEl) unifiedParkingEl.value = "";
+                document.getElementById("u_gname").value = "";
+                document.getElementById("u_gid").value = 0;
+                document.getElementById("u_password").value = "";
+                loadUsers();
             } catch(e) {
                 alert("שגיאת תקשורת: " + e.message);
             }
@@ -977,7 +1007,7 @@
                 const pId = u.parking_id;
                 
                 if (!groups[gName]) {
-                    groups[gName] = { rate: 2.20, totalFree: 0, totalPaid: 0, totalCost: 0, parkings: {} };
+                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 
                 if (u.user_type === 'admin' || u.user_type === 'manager') {
@@ -988,7 +1018,7 @@
                     parkingToGroup[pId] = gName;
                     parkingNames[pId] = u.parking_name || pId;
                     if (!groups[gName].parkings[pId]) {
-                        groups[gName].parkings[pId] = { name: parkingNames[pId], free: 0, paid: 0, cost: 0 };
+                        groups[gName].parkings[pId] = { name: parkingNames[pId], aiCalls: 0, opCalls: 0, durationSec: 0, cost: 0 };
                     }
                 }
             });
@@ -1029,53 +1059,104 @@
                 }
             }
             
-            // 3. Process calls
-            const groupUsage = {}; 
+            // 3. Process calls using 5-minute vehicle grouping and per-second billing (no free quota, no 1-min minimum)
+            const vehicleGroups = [];
+            const plateGroupMap = {}; // key: `${pId}_${plate}` -> index of latest open group
             
             allCalls.forEach(c => {
-                const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
-                if (isForwarded) return; 
-                
                 const pId = c.parking_id || 'unknown';
+                const plate = c.plate_number || '';
+                const callTime = new Date(c.created_at).getTime();
+                const durationSec = parseInt(c.call_duration || 0);
+                const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+                const groupKey = plate ? `${pId}_${plate}` : '';
+                
+                let foundGroup = null;
+                if (groupKey && plateGroupMap[groupKey] !== undefined) {
+                    const gi = plateGroupMap[groupKey];
+                    if (callTime - vehicleGroups[gi].lastTime <= 5 * 60 * 1000) {
+                        foundGroup = gi;
+                    }
+                }
+                
+                if (foundGroup !== null) {
+                    vehicleGroups[foundGroup].calls.push(c);
+                    vehicleGroups[foundGroup].lastTime = Math.max(vehicleGroups[foundGroup].lastTime, callTime);
+                    vehicleGroups[foundGroup].totalDuration += durationSec;
+                    if (!isForwarded) vehicleGroups[foundGroup].hasAI = true;
+                    if (isForwarded) vehicleGroups[foundGroup].hasForwarded = true;
+                } else {
+                    const idx = vehicleGroups.length;
+                    vehicleGroups.push({
+                        pId,
+                        plate,
+                        calls: [c],
+                        firstTime: callTime,
+                        lastTime: callTime,
+                        totalDuration: durationSec,
+                        hasAI: !isForwarded,
+                        hasForwarded: isForwarded
+                    });
+                    if (groupKey) plateGroupMap[groupKey] = idx;
+                }
+            });
+            
+            vehicleGroups.forEach(vg => {
+                const pId = vg.pId;
                 const gName = parkingToGroup[pId] || t('no_group');
                 
                 if (!groups[gName]) {
-                    groups[gName] = { rate: 2.20, totalFree: 0, totalPaid: 0, totalCost: 0, parkings: {} };
+                    groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 if (!groups[gName].parkings[pId]) {
-                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, free: 0, paid: 0, cost: 0 };
+                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, aiCalls: 0, opCalls: 0, durationSec: 0, cost: 0 };
                 }
-                
-                if (!groupUsage[gName]) groupUsage[gName] = 0;
                 
                 const ratePerMin = groups[gName].rate;
                 const ratePerSec = ratePerMin / 60.0;
-                const duration = parseInt(c.call_duration || 0);
+                const onlyForwarded = vg.hasForwarded && !vg.hasAI;
+                let firstForwardedCharged = false;
                 
-                let cost = 0;
-                let isFree = false;
-                
-                if (groupUsage[gName] < 100) {
-                    groupUsage[gName]++;
-                    isFree = true;
-                } else {
-                    if (duration <= 60) cost = ratePerMin;
-                    else cost = ratePerMin + ((duration - 60) * ratePerSec);
-                }
-                
-                if (isFree) {
-                    groups[gName].totalFree++;
-                    groups[gName].parkings[pId].free++;
-                } else {
-                    groups[gName].totalPaid++;
+                vg.calls.forEach(c => {
+                    const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
+                    const durationSec = parseInt(c.call_duration || 0);
+                    let cost = 0;
+                    
+                    if (!isForwarded) {
+                        // AI call: charged by actual seconds
+                        cost = durationSec * ratePerSec;
+                        groups[gName].aiCalls++;
+                        groups[gName].parkings[pId].aiCalls++;
+                    } else {
+                        groups[gName].opCalls++;
+                        groups[gName].parkings[pId].opCalls++;
+                        if (onlyForwarded && !firstForwardedCharged) {
+                            // Direct to operator without AI in 5-min window: 50%
+                            cost = durationSec * ratePerSec * 0.5;
+                            firstForwardedCharged = true;
+                        } else {
+                            // Forwarded after AI in 5-min window or repeat within 5 min: 0 cost
+                            cost = 0;
+                        }
+                    }
+                    
+                    groups[gName].totalDurationSec += durationSec;
                     groups[gName].totalCost += cost;
-                    groups[gName].parkings[pId].paid++;
+                    groups[gName].parkings[pId].durationSec += durationSec;
                     groups[gName].parkings[pId].cost += cost;
-                }
+                });
             });
             
             financeData = groups;
             renderFinanceTable();
+        }
+        
+        function formatSecondsToDuration(sec) {
+            const totalSec = Math.round(sec || 0);
+            const mins = Math.floor(totalSec / 60);
+            const remSec = totalSec % 60;
+            if (mins === 0) return `${remSec} שנ'`;
+            return `${mins} דק' ו-${remSec} שנ' (${totalSec} שנ')`;
         }
         
         function renderFinanceTable() {
@@ -1089,17 +1170,17 @@
             
             groupNames.forEach(gName => {
                 const g = financeData[gName];
-                const totalAI = g.totalFree + g.totalPaid;
+                const totalCalls = g.aiCalls + g.opCalls;
                 
-                if (totalAI === 0 && Object.keys(g.parkings).length === 0) return;
+                if (totalCalls === 0 && Object.keys(g.parkings).length === 0) return;
                 
                 hasData = true;
                 htmlContent += `
                     <tr>
                         <td><strong>${gName}</strong></td>
-                        <td>${totalAI}</td>
-                        <td style="color: var(--accent-blue); font-weight:bold;">${g.totalFree} / 100</td>
-                        <td style="color: var(--accent-red); font-weight:bold;">${g.totalPaid}</td>
+                        <td style="color: var(--accent-green); font-weight:bold;">${g.aiCalls}</td>
+                        <td style="color: var(--accent-blue); font-weight:bold;">${g.opCalls}</td>
+                        <td>${formatSecondsToDuration(g.totalDurationSec)}</td>
                         <td>${g.rate.toFixed(2)} ₪</td>
                         <td style="font-weight: bold; color: ${g.totalCost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${g.totalCost.toFixed(2)} ₪</td>
                         <td>
@@ -1132,16 +1213,16 @@
             
             pIds.forEach(pId => {
                 const p = g.parkings[pId];
-                const totalAI = p.free + p.paid;
+                const totalCalls = p.aiCalls + p.opCalls;
                 
-                if (totalAI === 0) return;
+                if (totalCalls === 0) return;
                 
                 htmlContent += `
                     <tr>
                         <td><strong>${p.name}</strong> <span style="color: gray; font-size: 0.8em;">(${pId})</span></td>
-                        <td>${totalAI}</td>
-                        <td style="color: var(--accent-blue);">${p.free}</td>
-                        <td style="color: var(--accent-red);">${p.paid}</td>
+                        <td style="color: var(--accent-green); font-weight:bold;">${p.aiCalls}</td>
+                        <td style="color: var(--accent-blue); font-weight:bold;">${p.opCalls}</td>
+                        <td>${formatSecondsToDuration(p.durationSec)}</td>
                         <td style="font-weight: bold; color: ${p.cost > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${p.cost.toFixed(2)} ₪</td>
                     </tr>
                 `;
@@ -1221,7 +1302,7 @@
         </div>
     </div>
     <script src="translations.js?v=1.1.20"></script>
-    <script src="app.js?v=4.1.3"></script>
+    <script src="app.js?v=4.0.8"></script>
 
 <script>
     function selectAdminMobile(tabId, view, title) {
