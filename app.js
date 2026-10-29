@@ -3883,6 +3883,47 @@ window.printAICost = function() {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
 };
 
+window.downloadManagerReportPDF = function(parkingIdOverride, isMonthlyOverride) {
+    let pid = parkingIdOverride;
+    if (!pid) {
+        const selector = document.getElementById('parking-selector');
+        pid = (selector && selector.value && selector.value !== 'all') ? selector.value : (typeof currentParkingId !== 'undefined' && currentParkingId !== 'all' ? currentParkingId : '473223100');
+    }
+    let url = `${API_BASE_URL}/api/reports/download_pdf?parking_id=${encodeURIComponent(pid)}`;
+    if (typeof isMonthlyOverride === 'boolean') {
+        url += `&is_monthly=${isMonthlyOverride ? '1' : '0'}`;
+    }
+    window.open(url, '_blank');
+};
+
+window.sendManagerReportNow = async function(parkingIdOverride) {
+    let pid = parkingIdOverride;
+    if (!pid) {
+        const selector = document.getElementById('parking-selector');
+        pid = (selector && selector.value && selector.value !== 'all') ? selector.value : (typeof currentParkingId !== 'undefined' && currentParkingId !== 'all' ? currentParkingId : 'all');
+    }
+    const targetDesc = (pid === 'all') ? 'לכל החניונים הפעילים עם מייל מוגדר' : `לחניון ${pid}`;
+    if (!confirm(`האם לשלוח כעת את דוח המנהלים היומי (PDF) למייל המוגדר בטבלת המשתמשים (${targetDesc})?`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/send_now`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parking_id: pid })
+        });
+        const data = await res.json();
+        if (data.success && data.sent && data.sent.length > 0) {
+            const details = data.sent.map(s => `• חניון ${s.parking_name} (${s.parking_id}) -> נשלח אל: ${s.emails.join(', ')}`).join('\n');
+            alert(`✅ הדוח נשלח בהצלחה למייל!\n\n${details}`);
+        } else {
+            alert(`⚠️ שגיאה בשליחת הדוח: ${data.error || 'לא נמצאו נמענים'}`);
+        }
+    } catch (err) {
+        alert(`❌ שגיאת תקשורת בשליחת הדוח: ${err.message || err}`);
+    }
+};
+
 // ==========================================
 // Legal & Policies Modal Logic
 // ==========================================
