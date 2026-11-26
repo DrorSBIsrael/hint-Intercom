@@ -176,22 +176,14 @@ def parse_call_israel_dt(dt_str):
     if not dt_str:
         return None
     s = str(dt_str).strip()
+    if s.endswith("+00:00"):
+        s = s[:-6]
+    elif s.endswith("Z"):
+        s = s[:-1]
     try:
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
         dt = datetime.fromisoformat(s)
         if dt.tzinfo is not None:
-            # Note: some records in calls_log are stored with +00:00 even though they were generated in Israel time or UTC.
-            # Let's check offset: if tzinfo is UTC, convert or strip consistently with frontend new Date(c.created_at)
-            try:
-                from zoneinfo import ZoneInfo
-
-                tz = ZoneInfo("Asia/Jerusalem")
-            except ImportError:
-                import pytz
-
-                tz = pytz.timezone("Asia/Jerusalem")
-            dt = dt.astimezone(tz).replace(tzinfo=None)
+            dt = dt.replace(tzinfo=None)
         return dt
     except Exception:
         try:
