@@ -195,6 +195,9 @@
                         <button id="nav-operator-btn" class="nav-role-btn" style="display: none;" onclick="window.location.href='/index.html'">מוקד</button>
                     </div>
                     <div style="width: 1px; height: 38px; background-color: var(--border-color); margin: 0 5px;"></div>
+                    <button id="btn-refresh-owner" class="btn-primary square-btn" onclick="refreshManagerDashboard()" title="רענון נתונים מהשרת" style="background: var(--accent-blue);">
+                        <span>🔄</span><span>רענן</span>
+                    </button>
                     <button class="btn-primary square-btn" onclick="exportTableToCSV('calls-table', 'calls_log.csv')" title="ייצוא כל השיחות">
                         <span>CSV</span>
                     </button>

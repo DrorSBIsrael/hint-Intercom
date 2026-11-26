@@ -890,6 +890,29 @@ async function fetchInitialCalls() {
 }
 
 window.dbParkingNames = {};
+window.dbParkingRates = {};
+window.dbUserRates = {};
+
+function getEffectiveRatePerMinute(parkingId) {
+    const loggedUser = (sessionStorage.getItem('username') || '').trim();
+    const role = (sessionStorage.getItem('intercom_user_role') || '').trim();
+    const pid = String(parkingId || (typeof currentParkingId !== 'undefined' ? currentParkingId : '') || '').trim();
+
+    // 1. If a specific parking lot is passed/selected and has a rate in dbParkingRates, use it
+    // (Unless the logged-in user is a manager/owner with their own custom rate in dbUserRates for that parking)
+    if (loggedUser && window.dbUserRates && window.dbUserRates[loggedUser] !== undefined && role !== 'admin') {
+        return parseFloat(window.dbUserRates[loggedUser]);
+    }
+    if (pid && pid !== 'all' && window.dbParkingRates && window.dbParkingRates[pid] !== undefined) {
+        return parseFloat(window.dbParkingRates[pid]);
+    }
+    if (loggedUser && window.dbUserRates && window.dbUserRates[loggedUser] !== undefined) {
+        return parseFloat(window.dbUserRates[loggedUser]);
+    }
+    const rateStr = sessionStorage.getItem('intercom_rate_per_minute');
+    return rateStr ? parseFloat(rateStr) : 2.20;
+}
+window.getEffectiveRatePerMinute = getEffectiveRatePerMinute;
 
 async function fetchParkingNames() {
     try {
@@ -900,7 +923,48 @@ async function fetchParkingNames() {
     } catch (e) {
         console.error("Failed to fetch parking names", e);
     }
+    try {
+        const ratesRes = await fetch(`${API_BASE_URL}/api/parkings_rates?t=${Date.now()}`);
+        if (ratesRes.ok) {
+            const ratesData = await ratesRes.json();
+            if (ratesData.parking_rates) window.dbParkingRates = ratesData.parking_rates;
+            if (ratesData.user_rates) {
+                window.dbUserRates = ratesData.user_rates;
+                const loggedUser = (sessionStorage.getItem('username') || '').trim();
+                if (loggedUser && window.dbUserRates[loggedUser] !== undefined) {
+                    sessionStorage.setItem('intercom_rate_per_minute', String(window.dbUserRates[loggedUser]));
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to fetch parking rates from /api/parkings_rates", e);
+    }
 }
+
+function isManagerOrAdminDashboard() {
+    const path = (window.location.pathname || '').toLowerCase();
+    if (path.includes('owner_dashboard') || path.includes('admin_dashboard')) return true;
+    if (document.getElementById('owner-dashboard-marker') || document.getElementById('admin-dashboard-marker')) return true;
+    return false;
+}
+
+window.refreshManagerDashboard = async function() {
+    const loader = document.getElementById('global-loader');
+    if (loader) loader.style.display = 'flex';
+    try {
+        await fetchParkingNames();
+        await Promise.all([
+            fetchAndRenderActionList('blocked').catch(e => console.warn('Blocked fetch skipped', e)),
+            fetchAndRenderActionList('authorized').catch(e => console.warn('Authorized fetch skipped', e)),
+            (typeof fetchAndRenderSuppliers === 'function' ? fetchAndRenderSuppliers().catch(e => console.warn('Suppliers fetch skipped', e)) : Promise.resolve()),
+            fetchInitialCalls()
+        ]);
+    } catch (e) {
+        console.error("Error refreshing manager dashboard:", e);
+    } finally {
+        if (loader) loader.style.display = 'none';
+    }
+};
 
 async function initDashboard() {
     await fetchParkingNames();
@@ -913,6 +977,22 @@ async function initDashboard() {
     
     await fetchInitialCalls();
     
+    // Attach guards to all scrollable lists and tables
+    setupGlobalListGuards();
+    
+    // Setup owner forms
+    setupOwnerListForms();
+    if (typeof setupOwnerSupplierForm === 'function') {
+        setupOwnerSupplierForm();
+    }
+
+    // For Manager (owner_dashboard) and Admin (admin_dashboard), DO NOT subscribe to live continuous movements
+    // or run background polling timers! Data refreshes only on manual Refresh button click.
+    if (isManagerOrAdminDashboard()) {
+        console.log("ℹ️ Manager/Admin dashboard detected: continuous live polling disabled (manual refresh mode).");
+        return;
+    }
+
     try {
         const configRes = await fetch(`${API_BASE_URL}/api/config`);
         const config = await configRes.json();
@@ -3343,9 +3423,8 @@ async function calculateAICosts(calls) {
         }
     }
 
-    const rateStr = sessionStorage.getItem('intercom_rate_per_minute');
-    const ratePerMinute = rateStr ? parseFloat(rateStr) : 2.20;
-    const ratePerSec = ratePerMinute / 60.0;
+    const activeParkingForRate = (typeof currentParkingId !== 'undefined' && currentParkingId !== 'all') ? currentParkingId : null;
+    const defaultRatePerMinute = getEffectiveRatePerMinute(activeParkingForRate);
     
     // ===== Step 1: Group calls by same plate_number within 5 minutes =====
     const vehicleGroups = [];
@@ -3409,14 +3488,16 @@ async function calculateAICosts(calls) {
             const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             const isForwarded = (c.is_forwarded === 'true' || c.is_forwarded === true);
             const durationSec = parseInt(c.call_duration || 0);
+            const callRatePerMin = getEffectiveRatePerMinute(c.parking_id);
+            const callRatePerSec = callRatePerMin / 60.0;
             
             let callCost = 0;
             if (!isForwarded) {
                 // AI call: charged normally by actual seconds
-                callCost = durationSec * ratePerSec;
+                callCost = durationSec * callRatePerSec;
             } else if (onlyForwarded && !firstForwardedCharged) {
                 // Direct to operator (no AI call in 5-min window): 50% per second on first call, repeat calls within 5 min are free
-                callCost = durationSec * ratePerSec * 0.5;
+                callCost = durationSec * callRatePerSec * 0.5;
                 firstForwardedCharged = true;
             } else {
                 // Forwarded call after/with AI in 5-min window, or repeat forwarded call within 5 min: 0 cost
@@ -3471,7 +3552,8 @@ async function calculateAICosts(calls) {
     if (quotaDisplay) {
         const aiFmt = totalAICostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₪';
         const opFmt = totalOpCostInWindow.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₪';
-        quotaDisplay.innerHTML = `<span>עלות שיחות AI: <strong id="ai-only-cost-display" style="color: var(--accent-green);">${aiFmt}</strong></span> <span style="margin: 0 6px;">|</span> <span>עלות שיחות שעברו למוקד: <strong id="op-only-cost-display" style="color: var(--accent-blue);">${opFmt}</strong></span>`;
+        const rateFmt = defaultRatePerMinute.toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₪';
+        quotaDisplay.innerHTML = `<span>עלות שיחות AI: <strong id="ai-only-cost-display" style="color: var(--accent-green);">${aiFmt}</strong></span> <span style="margin: 0 6px;">|</span> <span>עלות שיחות שעברו למוקד: <strong id="op-only-cost-display" style="color: var(--accent-blue);">${opFmt}</strong></span> <span style="margin: 0 6px;">|</span> <span>תעריף לדקה: <strong style="color: var(--text-color);">${rateFmt}</strong></span>`;
     }
     
     aiCallsInWindow.sort((a, b) => new Date(b.call.created_at) - new Date(a.call.created_at));
@@ -3921,6 +4003,24 @@ window.sendManagerReportNow = async function(parkingIdOverride) {
         }
     } catch (err) {
         alert(`❌ שגיאת תקשורת בשליחת הדוח: ${err.message || err}`);
+    }
+};
+
+window.sendSystemHealthReportNow = async function() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/send_health_now`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (data.success && data.info) {
+            alert(`✅ דיווח תקינות המערכת האחרון נשלח בהצלחה למייל של u001 (${data.info.recipient})!\nסטטוס: ${data.info.system_status}\nזמן בדיקה: ${data.info.checked_at}`);
+        } else {
+            alert(`⚠️ שגיאה בשליחת דיווח תקינות: ${data.error || 'שגיאה לא ידועה'}`);
+        }
+    } catch (err) {
+        alert(`❌ שגיאת תקשורת בשליחת דיווח תקינות: ${err.message || err}`);
     }
 };
 

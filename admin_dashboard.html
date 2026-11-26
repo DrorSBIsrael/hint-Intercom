@@ -25,7 +25,7 @@
         <div style="color: white; margin-top: 25px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">טוען נתונים...</div>
     </div>
 
-    <div id="owner-dashboard-marker" style="display:none;"></div>
+    <div id="admin-dashboard-marker" style="display:none;"></div>
 
     <!-- Dashboard Screen -->
     <div id="dashboard-screen" class="screen active">
@@ -391,6 +391,7 @@
                     <button class="btn btn-refresh" onclick="printTable('financeTable')">הדפס</button>
                     <button class="btn btn-refresh" onclick="downloadManagerReportPDF()">📄 הורד דוח PDF</button>
                     <button class="btn btn-refresh" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="sendManagerReportNow()">📧 שלח דוח למייל</button>
+                    <button class="btn btn-refresh" style="border-color: var(--accent-blue); color: var(--accent-blue);" onclick="sendSystemHealthReportNow()">🩺 שלח דוח תקינות (u001)</button>
                     <button class="btn btn-refresh" onclick="loadFinance()">רענן</button>
                 </div>
             </div>
@@ -1014,25 +1015,38 @@
             
             const groups = {}; 
             const parkingToGroup = {}; 
-            const parkingNames = {}; 
+            const parkingNames = {};
+            const parkingRates = {};
             
             usersData.forEach(u => {
                 const gName = u.group_name || t('no_group');
                 const pId = u.parking_id;
+                const uRate = u.rate_per_minute ? parseFloat(u.rate_per_minute) : 2.20;
                 
                 if (!groups[gName]) {
                     groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 
-                if (u.user_type === 'admin' || u.user_type === 'manager') {
-                    if (u.rate_per_minute) groups[gName].rate = parseFloat(u.rate_per_minute);
+                if (u.user_type === 'admin' || u.user_type === 'manager' || u.user_type === 'owner' || u.user_type === 'מנהל') {
+                    if (u.rate_per_minute) {
+                        if (uRate !== 2.20 || groups[gName].rate === 2.20) {
+                            groups[gName].rate = uRate;
+                        }
+                        if (pId && pId !== 'all') {
+                            if (parkingRates[pId] === undefined || uRate !== 2.20) {
+                                parkingRates[pId] = uRate;
+                            }
+                        }
+                    }
                 }
                 
                 if (pId) {
                     parkingToGroup[pId] = gName;
                     parkingNames[pId] = u.parking_name || pId;
                     if (!groups[gName].parkings[pId]) {
-                        groups[gName].parkings[pId] = { name: parkingNames[pId], aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
+                        groups[gName].parkings[pId] = { name: parkingNames[pId], rate: parkingRates[pId] || uRate || 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
+                    } else if (parkingRates[pId]) {
+                        groups[gName].parkings[pId].rate = parkingRates[pId];
                     }
                 }
             });
@@ -1123,10 +1137,10 @@
                     groups[gName] = { rate: 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, totalDurationSec: 0, totalCost: 0, parkings: {} };
                 }
                 if (!groups[gName].parkings[pId]) {
-                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
+                    groups[gName].parkings[pId] = { name: parkingNames[pId] || pId, rate: parkingRates[pId] || groups[gName].rate || 2.20, aiCalls: 0, opCalls: 0, aiCost: 0, opCost: 0, durationSec: 0, cost: 0 };
                 }
                 
-                const ratePerMin = groups[gName].rate;
+                const ratePerMin = groups[gName].parkings[pId].rate || parkingRates[pId] || groups[gName].rate || 2.20;
                 const ratePerSec = ratePerMin / 60.0;
                 const onlyForwarded = vg.hasForwarded && !vg.hasAI;
                 let firstForwardedCharged = false;

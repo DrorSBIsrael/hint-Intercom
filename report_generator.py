@@ -237,6 +237,8 @@ def classify_operator_call(call_row) -> str:
         return "חשד לרמאות - אי התאמה למצלמה"
     if "בקשת מוקד אנושי מפורשת" in combined:
         return "בקשת מוקד אנושי מפורשת ע\"י נהג"
+    if "בקשת עזרה ביציאה" in combined or "מחיר על הצג" in combined:
+        return "בקשת עזרה ביציאה (מחיר על הצג)"
     if "2011" in combined or "יציאה כפולה" in combined:
         return "סירוב (2011) - יציאה כפולה"
     if "3017" in combined or "2004" in combined or "חסר הרשאות" in combined:
@@ -433,6 +435,77 @@ def format_sec_short(sec: int) -> str:
     if m == 0:
         return f"{s} שנ'"
     return f"{m}:{s:02d} דק'"
+
+
+def compute_problematic_vehicles(month_calls: list, min_days_exclusive: int = 5, max_items: int = 30) -> list:
+    vehicles = {}
+    name_regex = re.compile(r"שם:\s*([^)\]|]+)")
+
+    for c in month_calls:
+        plate = str(c.get("plate_number") or "").strip()
+        if not plate or plate == "-" or "לא ידוע" in plate or "לא זוהה" in plate or len(plate) < 5:
+            continue
+
+        if plate not in vehicles:
+            vehicles[plate] = {
+                "plate": plate,
+                "days": set(),
+                "total_calls": 0,
+                "ai_calls": 0,
+                "op_calls": 0,
+                "plate_corrected": 0,
+                "driver_name": "",
+                "reasons": {},
+            }
+
+        v = vehicles[plate]
+        v["days"].add(c["_dt"].date())
+        v["total_calls"] += 1
+        if c["_is_fwd"]:
+            v["op_calls"] += 1
+            reason = classify_operator_call(c)
+        else:
+            v["ai_calls"] += 1
+            reason = classify_ai_call(c)
+
+        v["reasons"][reason] = v["reasons"].get(reason, 0) + 1
+
+        if is_plate_corrected_in_call(c):
+            v["plate_corrected"] += 1
+
+        dname = str(c.get("driver_name") or "").strip()
+        if not dname or dname == "לא ידוע":
+            m = name_regex.search(str(c.get("request_summary") or ""))
+            if m:
+                extracted = m.group(1).strip()
+                if extracted and extracted != "לא ידוע":
+                    dname = extracted
+        if dname and dname != "לא ידוע":
+            v["driver_name"] = dname
+
+    problematic = []
+    for plate, v in vehicles.items():
+        num_days = len(v["days"])
+        if num_days > min_days_exclusive:
+            top_reason = "-"
+            if v["reasons"]:
+                top_reason = max(v["reasons"].items(), key=lambda kv: kv[1])[0]
+            problematic.append({
+                "plate": plate,
+                "driver_name": v["driver_name"] or "לא ידוע",
+                "days_count": num_days,
+                "total_calls": v["total_calls"],
+                "ai_calls": v["ai_calls"],
+                "op_calls": v["op_calls"],
+                "plate_corrected": v["plate_corrected"],
+                "top_reason": top_reason,
+            })
+
+    problematic.sort(
+        key=lambda x: (x["days_count"], x["total_calls"], x["op_calls"]),
+        reverse=True,
+    )
+    return problematic[:max_items]
 
 
 # =====================================================================
@@ -877,6 +950,70 @@ def generate_parking_report_pdf(
         build_summary_section(
             f"סיכום מנהלים חודשי מצטבר - כל חודש {month_label}", month_calls
         )
+
+    # 3. Problematic Vehicles Section (called on more than 5 distinct days in the month, up to 30 vehicles)
+    problem_vehicles = compute_problematic_vehicles(month_calls, min_days_exclusive=5, max_items=30)
+    if problem_vehicles:
+        story.append(Spacer(1, 14))
+        story.append(
+            HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cbd5e1"))
+        )
+        story.append(Spacer(1, 8))
+        story.append(
+            Paragraph(
+                bidi_visual(
+                    f"רכבים בעייתיים בחודש {month_label} (התקשרו ביותר מ-5 ימים שונים - מוצגים {len(problem_vehicles)} מתוך עד 30)"
+                ),
+                section_style,
+            )
+        )
+        story.append(Spacer(1, 6))
+
+        pv_headers = [
+            bidi_visual("סיבת פנייה עיקרית"),
+            bidi_visual("תיקוני לוחית"),
+            bidi_visual('סה"כ שיחות (AI/מוקד)'),
+            bidi_visual("ימי התקשרות"),
+            bidi_visual("שם נהג / מנוי"),
+            bidi_visual("מספר רכב"),
+            "#",
+        ]
+        pv_data = [pv_headers]
+        for idx, pv in enumerate(problem_vehicles, start=1):
+            calls_breakdown_str = f"{pv['total_calls']} ({pv['ai_calls']} AI / {pv['op_calls']} מוקד)"
+            pv_data.append(
+                [
+                    bidi_visual(str(pv["top_reason"])[:36]),
+                    str(pv["plate_corrected"]),
+                    bidi_visual(calls_breakdown_str),
+                    bidi_visual(f"{pv['days_count']} ימים"),
+                    bidi_visual(str(pv["driver_name"])[:20]),
+                    str(pv["plate"]),
+                    str(idx),
+                ]
+            )
+
+        t_pv = Table(pv_data, colWidths=[150, 52, 98, 62, 86, 64, 24], repeatRows=1)
+        t_pv_style = [
+            ("FONTNAME", (0, 0), (-1, 0), font_bold),
+            ("FONTNAME", (0, 1), (-1, -1), font_reg),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.0),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#b91c1c")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ]
+        for r_idx in range(1, len(pv_data)):
+            if r_idx % 2 == 0:
+                t_pv_style.append(
+                    ("BACKGROUND", (0, r_idx), (-1, r_idx), colors.HexColor("#fef2f2"))
+                )
+        t_pv.setStyle(TableStyle(t_pv_style))
+        story.append(t_pv)
 
     doc.build(story)
     return buf.getvalue()
