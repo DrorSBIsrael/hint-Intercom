@@ -229,6 +229,8 @@ def classify_operator_call(call_row) -> str:
         return "חשד לרמאות - אי התאמה למצלמה"
     if "בקשת מוקד אנושי מפורשת" in combined:
         return "בקשת מוקד אנושי מפורשת ע\"י נהג"
+    if "מחיר כבר מופיע על הצג" in combined:
+        return "מחיר כבר מופיע על הצג"
     if "בקשת עזרה ביציאה" in combined or "מחיר על הצג" in combined:
         return "בקשת עזרה ביציאה (מחיר על הצג)"
     if "2011" in combined or "יציאה כפולה" in combined:
@@ -244,6 +246,7 @@ def classify_operator_call(call_row) -> str:
     if req:
         # Clean out plate/name details in parentheses for grouping
         cleaned = re.sub(r"\s*\(לוחית:.*?\)", "", req).strip()
+        cleaned = re.sub(r"\s*\([\d.,]+\s*(?:ש[\"׳״']?ח|שח|₪)\)", "", cleaned).strip()
         return cleaned[:45] if cleaned else "העברה למוקד אנושי (כללי)"
     return "העברה למוקד אנושי (כללי)"
 
@@ -253,6 +256,8 @@ def classify_ai_call(call_row) -> str:
     act = strip_niqqud(str(call_row.get("actions_taken") or "")).strip()
     combined = f"{req} | {act}"
 
+    if "מחיר כבר מופיע על הצג" in combined:
+        return "מחיר כבר מופיע על הצג"
     if (
         "חיוב תשלום" in combined
         or "נשלח לחשבון" in combined
@@ -277,6 +282,7 @@ def classify_ai_call(call_row) -> str:
         return "רכב לא מוכר במערכת"
     if req:
         cleaned = re.sub(r"\s*\(לוחית:.*?\)", "", req).strip()
+        cleaned = re.sub(r"\s*\([\d.,]+\s*(?:ש[\"׳״']?ח|שח|₪)\)", "", cleaned).strip()
         return cleaned[:45] if cleaned else "טופל ע\"י AI (כללי)"
     return "טופל ע\"י AI (כללי)"
 
